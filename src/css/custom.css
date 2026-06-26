@@ -1,0 +1,45 @@
+@import '@fontsource/red-hat-display/400.css';
+@import '@fontsource/red-hat-display/500.css';
+@import '@fontsource/red-hat-display/600.css';
+@import '@fontsource/red-hat-display/700.css';
+
+/* Nimbus brand: Royal Blue primary */
+:root {
+  --ifm-color-primary: #252E72;
+  --ifm-color-primary-dark: #1e2660;
+  --ifm-color-primary-darker: #1a2058;
+  --ifm-color-primary-darkest: #0f1331;
+  --ifm-color-primary-light: #2d3880;
+  --ifm-color-primary-lighter: #3a458e;
+  --ifm-color-primary-lightest: #4f5fa8;
+
+  --ifm-font-family-base: 'Red Hat Display', sans-serif;
+  --ifm-heading-font-family: 'Red Hat Display', sans-serif;
+  --ifm-code-font-size: 95%;
+}
+
+/* Royal Blue navbar (overrides docusaurus dark navbar default gray) */
+.navbar--dark {
+  --ifm-navbar-background-color: #252E72;
+  --ifm-navbar-link-color: rgba(255, 255, 255, 0.9);
+  --ifm-navbar-link-hover-color: #ffffff;
+  --ifm-navbar-link-active-color: #ffffff;
+  --ifm-navbar-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Active/hover states use --ifm-color-primary by default, which equals our
+   navbar background (#252E72) — pin them to white explicitly */
+.navbar--dark .navbar__link:hover,
+.navbar--dark .navbar__link--active {
+  color: #ffffff;
+  opacity: 1;
+}
+
+/* Footer hover links also fall back to --ifm-color-primary on dark background */
+.footer--dark {
+  --ifm-footer-link-hover-color: #ECF2F8;
+}
+
+.footer--dark .footer__link-item:hover {
+  color: #ECF2F8;
+}
