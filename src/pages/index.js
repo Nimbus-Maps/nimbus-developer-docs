@@ -18,8 +18,11 @@ function HomepageHero() {
           <Link className="button button--secondary button--lg" to="/guides/getting-started">
             Get Started
           </Link>
-          <Link className="button button--lg" to="/api/" style={{background: 'white', color: '#252E72', fontWeight: 600}}>
+          <Link className="button button--secondary button--lg" to="/api/">
             API Reference
+          </Link>
+          <Link className="button button--secondary button--lg" to="/guides/faq">
+            FAQ
           </Link>
         </div>
       </div>

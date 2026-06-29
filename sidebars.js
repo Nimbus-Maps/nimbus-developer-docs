@@ -17,6 +17,11 @@ const sidebars = {
       label: 'API Examples',
     },
     {
+      type: 'doc',
+      id: 'faq',
+      label: 'FAQ',
+    },
+    {
       type: 'category',
       label: 'Field Reference',
       items: [
