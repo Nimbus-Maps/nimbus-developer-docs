@@ -83,6 +83,11 @@ const config = {
             label: 'API Reference',
             position: 'left',
           },
+          {
+            to: '/guides/faq',
+            label: 'FAQ',
+            position: 'left',
+          },
         ],
       },
       footer: {
@@ -95,6 +100,7 @@ const config = {
               {label: 'Quick Reference', to: '/guides/quickstart'},
               {label: 'API Examples', to: '/guides/api-examples'},
               {label: 'Field Reference', to: '/guides/elasticsearch-schema'},
+              {label: 'FAQ', to: '/guides/faq'},
             ],
           },
           {
