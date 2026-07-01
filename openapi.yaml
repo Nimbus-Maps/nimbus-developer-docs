@@ -1166,6 +1166,126 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /titles/{titleId}/traffic:
+    get:
+      operationId: getTitleTraffic
+      tags:
+        - Titles
+      summary: Get road traffic estimates near a title
+      description: |
+        Returns the top 5 busiest road segments (by motor vehicle count) within a
+        configurable radius of the title polygon.
+        Combines data from both the estimated and average traffic tables into a single response.
+        Results are ordered by motor vehicle count descending.
+      security:
+        - OAuth2: [search.titles]
+      parameters:
+        - name: titleId
+          in: path
+          required: true
+          description: Title UUID
+          schema:
+            type: string
+            format: uuid
+          example: "4665bc0b-69d6-4e04-8117-48bb25dfba2c"
+        - name: radius
+          in: query
+          required: false
+          description: Search radius in metres around the title polygon. Defaults to 200. Maximum 1000.
+          schema:
+            type: number
+            minimum: 1
+            maximum: 1000
+            default: 200
+          example: 200
+      responses:
+        "200":
+          description: Road traffic data near the title
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - titleId
+                  - radius
+                  - roads
+                properties:
+                  titleId:
+                    type: string
+                    format: uuid
+                  radius:
+                    type: number
+                    description: Radius in metres used for the search
+                  roads:
+                    type: array
+                    items:
+                      type: object
+                      required:
+                        - identifier
+                        - class
+                        - function
+                      properties:
+                        identifier:
+                          type: string
+                          description: OS road segment identifier (UUID)
+                        roadName:
+                          type: string
+                          nullable: true
+                        class:
+                          type: string
+                          description: Road classification (e.g. A Road, B Road, Minor Road)
+                        function:
+                          type: string
+                          description: Road function category
+                        estimated:
+                          type: object
+                          nullable: true
+                          description: Point-in-time estimated traffic counts
+                          properties:
+                            motorVehicles:
+                              type: number
+                              description: Estimated annual average daily motor vehicle count
+                            roundCount:
+                              type: integer
+                              description: Rounded estimated count
+                        average:
+                          type: object
+                          nullable: true
+                          description: Historical average traffic counts
+                          properties:
+                            motorVehicles:
+                              type: number
+                              description: Average annual daily motor vehicle count
+                            roundCount:
+                              type: integer
+                              description: Rounded average count
+              example:
+                titleId: "4665bc0b-69d6-4e04-8117-48bb25dfba2c"
+                radius: 200
+                roads:
+                  - identifier: "6A7DB418-EB37-4E57-9BB9-898774151247"
+                    roadName: "Hawk Hill"
+                    class: "Classified Unnumbered"
+                    function: "Minor Road"
+                    estimated:
+                      motorVehicles: 7259.8
+                      roundCount: 7000
+                    average:
+                      motorVehicles: 5155.0
+                      roundCount: 5000
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /footfall/{indexId}:
     get:
       operationId: getFootfall
