@@ -1391,6 +1391,330 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /titles/{titleId}/amenities:
+    get:
+      operationId: getTitleAmenities
+      tags:
+        - Titles
+      summary: Find amenities reachable within a given travel time from a title
+      description: |
+        Returns key amenity properties (NHS hospitals, superstores, petrol stations,
+        schools, railways) reachable from a title's centroid within a given travel time.
+
+        Results are ordered by straight-line distance from the title's centroid,
+        closest first. When `size` is less than the total number of matching properties,
+        this ensures the nearest amenities of each type are returned.
+      security:
+        - OAuth2:
+            - search.titles
+      parameters:
+        - name: titleId
+          in: path
+          required: true
+          description: Title UUID
+          schema:
+            type: string
+            format: uuid
+          example: "96fab4d6-a9b1-4a29-86e6-feb0a0e9c859"
+        - name: mode
+          in: query
+          required: false
+          description: Travel mode
+          schema:
+            type: string
+            enum: [car, foot]
+            default: car
+        - name: maxMinutes
+          in: query
+          required: false
+          description: Maximum travel time in minutes (1–60)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 60
+            default: 15
+        - name: size
+          in: query
+          required: false
+          description: Maximum number of results (1–50)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 25
+      responses:
+        "200":
+          description: Amenities found within the travel time polygon
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TitleAmenitiesResponse"
+              example:
+                titleId: "96fab4d6-a9b1-4a29-86e6-feb0a0e9c859"
+                centroid:
+                  lat: 51.4755
+                  lon: -0.8632
+                mode: "car"
+                maxMinutes: 10
+                results:
+                  took: 85
+                  timed_out: false
+                  hits:
+                    total:
+                      value: 16
+                      relation: eq
+                    hits:
+                      - _id: "8b1b4a2b-2911-4028-a303-b5c0dcf111b5"
+                        _source:
+                          mainAddress:
+                            fullAddress: "PACE WOODHOUSE, WOODHOUSE WAY, NUTHALL, NOTTINGHAM, NG16 1RQ"
+                          propertyCategory: "Commercial"
+                          uprns:
+                            - vOA:
+                                - typeCode: "209"
+                                  typeDescription: "Petrol Filling Stations (National Scheme)"
+        "400":
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Title not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Title exists but has no geometry centroid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "502":
+          description: Routing service temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Service misconfigured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+      responses:
+        "200":
+          description: Amenities found within the travel time polygon
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TravelTimeSearchResponse"
+              example:
+                travelTime:
+                  origin: "Twyford Railway Station, Reading"
+                  resolvedLatLon:
+                    lat: 51.4755
+                    lon: -0.8632
+                  mode: "car"
+                  maxMinutes: 10
+                results:
+                  took: 85
+                  timed_out: false
+                  hits:
+                    total:
+                      value: 16
+                      relation: eq
+                    hits:
+                      - _id: "96fab4d6-a9b1-4a29-86e6-feb0a0e9c859"
+                        _source:
+                          id: "96fab4d6-a9b1-4a29-86e6-feb0a0e9c859"
+                          number: "NT538016"
+                          mainAddress:
+                            fullAddress: "Sainsburys Supermarkets Ltd, Main Street, Nottingham, NG16 2LY"
+                            postcode:
+                              value: "NG16 2LY"
+                          propertyCategory: "Commercial"
+                          tenure: "Leasehold"
+                          owners:
+                            - companyName: "SAINSBURY'S SUPERMARKETS LTD"
+                              ownerCategory: "Company"
+                          uprns:
+                            - address: "Main Street, Nottingham, NG16 2LY"
+                              vOA:
+                                - typeCode: "139"
+                                  typeDescription: "Hypermarkets/Superstores (over 2500m²)"
+        "400":
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Origin location could not be resolved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "502":
+          description: Routing service temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Service misconfigured — required environment variables (ELASTICSEARCH_URL, ELASTICSEARCH_API_KEY, or GRAPHHOPPER_URL) are not set
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /titles/{titleId}/travel-time-polygon:
+    get:
+      operationId: getTitleTravelTimePolygon
+      tags:
+        - Titles
+      summary: Get the isochrone polygon for a title
+      description: |
+        Returns the GeoJSON polygon representing the area reachable from a title's
+        centroid within a given travel time and mode.
+
+        Use the returned `polygon` directly as a `geo_shape` filter in `POST /titles`
+        to run any property search (with your own filters) within the travel time area:
+
+        ```json
+        POST /titles
+        {
+          "query": {
+            "bool": {
+              "filter": [
+                { "geo_shape": { "geometry.centroid": { "shape": <polygon>, "relation": "within" } } },
+                { "term": { "propertyCategory": "Residential" } }
+              ]
+            }
+          }
+        }
+        ```
+      security:
+        - OAuth2:
+            - search.titles
+      parameters:
+        - name: titleId
+          in: path
+          required: true
+          description: Title UUID
+          schema:
+            type: string
+            format: uuid
+          example: "685ceaf1-5f9a-45ad-93fa-c15684589ed1"
+        - name: mode
+          in: query
+          required: false
+          description: Travel mode
+          schema:
+            type: string
+            enum: [car, foot]
+            default: car
+        - name: maxMinutes
+          in: query
+          required: false
+          description: Maximum travel time in minutes (1–60)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 60
+            default: 15
+      responses:
+        "200":
+          description: Isochrone polygon for the title
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  titleId:
+                    type: string
+                    format: uuid
+                  centroid:
+                    type: object
+                    properties:
+                      lat:
+                        type: number
+                      lon:
+                        type: number
+                  mode:
+                    type: string
+                    enum: [car, foot]
+                  maxMinutes:
+                    type: integer
+                  polygon:
+                    type: object
+                    description: GeoJSON geometry (Polygon or MultiPolygon) — pass directly to geo_shape filter in POST /titles
+              example:
+                titleId: "685ceaf1-5f9a-45ad-93fa-c15684589ed1"
+                centroid:
+                  lat: 51.4755
+                  lon: -0.8632
+                mode: "car"
+                maxMinutes: 10
+                polygon:
+                  type: "Polygon"
+                  coordinates: [[[−0.95, 51.45], [−0.80, 51.45], [−0.80, 51.50], [−0.95, 51.50], [−0.95, 51.45]]]
+        "400":
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Title not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Title exists but has no geometry centroid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "502":
+          description: Routing service temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: Service misconfigured
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /comps/nl-query:
     post:
       operationId: searchComparableDealsNaturalLanguage
@@ -3632,6 +3956,29 @@ components:
           type: object
         results:
           $ref: "#/components/schemas/CompsElasticsearchResponse"
+
+    TitleAmenitiesResponse:
+      type: object
+      properties:
+        titleId:
+          type: string
+          format: uuid
+          description: The title UUID used for the lookup
+        centroid:
+          type: object
+          properties:
+            lat:
+              type: number
+            lon:
+              type: number
+        mode:
+          type: string
+          enum: [car, foot]
+        maxMinutes:
+          type: integer
+        results:
+          type: object
+          description: Raw Elasticsearch response containing matching amenity property hits
 
     NaturalLanguageQueryRequest:
       type: object
