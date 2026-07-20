@@ -1,8 +1,10 @@
 ---
 sidebar_position: 4
+title: Property Title Field Reference
+slug: /property-search/fields/titles
 ---
 
-# Field Reference
+# Property Title Field Reference
 
 This document describes the available fields for property title searches.
 

@@ -1,10 +1,11 @@
 ---
 sidebar_position: 4
 title: FAQ
+slug: /property-search/faq
 description: Common questions about data coverage, search capabilities, rate limits, and authentication for the Nimbus Property Search API.
 ---
 
-# Frequently Asked Questions
+# Property Search FAQ
 
 Common questions about the Nimbus Property Search API — what data is available, how to query it, and what the limits are.
 
@@ -196,7 +197,7 @@ All endpoints return **JSON**. Geometry data (title boundaries, centroids) is re
 
 ### Is an OpenAPI specification available?
 
-Yes — the full OpenAPI 3.0 specification is available and rendered in the [API Reference](/api/) section of this documentation. It can also be downloaded and used to generate client SDKs in any language.
+Yes — the full OpenAPI 3.0 specification is available in the [Property Search API Reference](/api/property-search/) section of this documentation. It can also be downloaded and used to generate client SDKs in any language.
 
 ### Is there a sandbox or test environment?
 

@@ -1,8 +1,10 @@
 ---
-sidebar_position: 3
+sidebar_position: 4
+title: Examples
+slug: /property-search/examples
 ---
 
-# API Examples
+# Property Search API Examples
 
 Base URL: `https://api.nimbusmaps.co.uk/search/v1`
 

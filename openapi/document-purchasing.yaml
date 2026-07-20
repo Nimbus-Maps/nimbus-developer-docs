@@ -1,0 +1,2496 @@
+openapi: 3.1.0
+info:
+  title: Nimbus Document Purchase API
+  description: |
+    API service for purchasing Nimbus-provided documents, including land registry (HMLR) documents and other property-related documents.
+
+    This API enables customers to:
+    - Check document availability and pricing for a title number
+    - View pending applications on the title
+    - Purchase documents with token-based billing
+    - Receive documents via webhook delivery
+
+    ## Authentication
+
+    All requests must carry a valid Entra ID Bearer token issued for the Document API audience.
+    Two OAuth 2.0 grant types are supported; choose the one that fits your integration.
+
+    ### Delegated user flow (authorization code)
+
+    Use this flow when your server calls the API on behalf of an authenticated end user.
+    Every purchase and audit record is tied to that user's identity.
+
+    1. Direct the user to the Entra ID authorization endpoint to sign in
+    2. Receive an authorization code and exchange it for an access token
+    3. Request the scopes your integration needs: `docs.read`, `docs.purchase`, and/or `docs.webhooks.manage`
+    4. Include the access token in the `Authorization: Bearer <token>` header
+    5. Use the refresh token to obtain a new access token when the current one expires
+
+    Internally, the API uses the **OAuth 2.0 On-Behalf-Of (OBO) flow** to exchange the
+    incoming user token for backend-specific tokens when calling HMLR Legacy API and the
+    Ledger service. This is transparent to callers — you only need the delegated scopes
+    listed above.
+
+    ### Application flow (client credentials)
+
+    Use this flow when your server calls the API autonomously, without an end user
+    authenticating in real time. Purchases and audit records are tied to a Nimbus service
+    identity provisioned for your integration.
+
+    1. Contact Nimbus to have an Entra application registration created for your integration
+    2. Acquire a token using the client credentials grant against the Document API audience
+    3. Include the token in the `Authorization: Bearer <token>` header
+
+    Endpoint access is controlled by app roles granted to your registration. Always request the `/.default` 
+    scope when acquiring client credentials tokens.
+
+    ## Rate Limits
+    - 60 requests per minute per user
+    - 1,000 requests per hour per user
+
+    ## Workflow
+    1. Call `/check-availability` to see available documents and costs
+    2. Call `/purchase` with the documents you want to buy
+    3. Documents are delivered to your webhook URL when ready
+    4. Optionally poll `/orders/{order_id}` to check status
+
+  version: 1.0.0
+  contact:
+    name: Nimbus Support
+    email: support@nimbusproperty.co.uk
+  license:
+    name: Proprietary
+servers:
+  - url: https://api.nimbusmaps.co.uk/docs/v1
+    description: Production server
+  - url: https://api-preprod.nimbusmaps.xyz/docs/v1
+    description: Test server
+
+tags:
+  - name: Documents
+    description: Document availability and purchase operations
+  - name: Orders
+    description: Order status and management
+  - name: Health
+    description: Service health checks
+
+security:
+  - OAuth2: []
+  - OAuth2ClientCredentials: []
+
+paths:
+  /check-availability:
+    get:
+      tags:
+        - Documents
+      summary: Check document availability and costs
+      description: |
+        Check which HMLR documents are available for a given title and the token cost for each.
+        Also returns information about any pending applications on the title.
+
+        You can query by either:
+        - **title_number**: UK Land Registry title number (e.g., AB123456)
+        - **title_id**: Internal UUID identifier for the title
+
+        Exactly one of these parameters must be provided.
+
+        This endpoint:
+        - Queries HMLR for available documents
+        - Queries HMLR for pending applications
+        - Calculates token costs based on document types
+        - Returns current account balance
+
+        Results are cached for 5 minutes in Azure API Management.
+      operationId: checkAvailability
+      security:
+        - OAuth2: [ docs.read ]
+        - OAuth2ClientCredentials: []
+      parameters:
+        - name: title_number
+          in: query
+          required: false
+          description: UK Land Registry title number (e.g., AB123456). Either title_number
+            or title_id must be provided.
+          schema:
+            type: string
+            pattern: "^[A-Z]{1,3}[0-9]{1,7}$"
+            minLength: 2
+            maxLength: 10
+          example: "AB123456"
+        - name: title_id
+          in: query
+          required: false
+          description: Internal UUID identifier for the title. Either title_number or
+            title_id must be provided.
+          schema:
+            type: string
+            format: uuid
+          example: "0000a942-3cee-431d-bd71-d07cb27197ec"
+      responses:
+        "200":
+          description: Document availability information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AvailabilityCheckResponse"
+              examples:
+                immediateAvailable:
+                  summary: Documents available for immediate download
+                  value:
+                    data:
+                      title_status: "Title number is valid."
+                      title_status_code: "VALID"
+                      title_number: "AB123456"
+                      pending_applications: []
+                      referred_to_documents: []
+                      register:
+                        type: "Register"
+                        type_code: "REGISTER"
+                        purchase_identifier: "register"
+                        availability: "available for immediate download"
+                        availability_code: "IMMEDIATE"
+                        backdated: false
+                        token_cost: 7
+                        previously_purchased: null
+                      title_plan:
+                        type: "Plan"
+                        type_code: "TITLEPLAN"
+                        purchase_identifier: "title_plan"
+                        availability: "available for immediate download"
+                        availability_code: "IMMEDIATE"
+                        backdated: false
+                        token_cost: 7
+                        previously_purchased: null
+                    total_token_cost_estimate: 14
+                    current_balance: 150
+                withPendingApplications:
+                  summary: Title with pending applications
+                  value:
+                    data:
+                      title_status: "There is at least one pending application for registration
+                        against this title number. You may want to view the day
+                        list."
+                      title_status_code: "PENDING_APPLICATIONS"
+                      title_number: "CD789012"
+                      pending_applications:
+                        - application_type: "50"
+                          application_type_description: "Dispositionary First Lease (Old Title)"
+                          expedited: "false"
+                          application_reference: "FA8480F"
+                          priority_date: "2025-12-29"
+                          priority_time: "06:08:45"
+                          application_progress: "Received: Priority Protected"
+                          customer_reference: "VH/ID57587"
+                          application_received_by: "20"
+                          lodged_by: "SPENCER WEST LLP
+
+                            LONGBOW HOUSE
+
+                            20 CHISWELL STREET
+
+                            LONDON
+
+                            EC1Y 4TW"
+                        - application_type: "30"
+                          application_type_description: "Dealing"
+                          expedited: "false"
+                          application_reference: "N629ZCV"
+                          priority_date: "2025-11-24"
+                          priority_time: "12:26:21"
+                          application_progress: "Received: Priority Protected - Awaiting Processing"
+                          customer_reference: "ZEL/4477"
+                          application_received_by: "20"
+                          lodged_by: "JOWETT KENNEDY FIDLER LLP
+
+                            2 THE EMBANKMENT
+
+                            SOVEREIGN STREET
+
+                            LEEDS
+
+                            LS1 4BA"
+                        - application_type: "30"
+                          application_type_description: "Dealing"
+                          expedited: "true"
+                          application_reference: "S531VST"
+                          priority_date: "2025-02-06"
+                          priority_time: "11:04:07"
+                          application_progress: "Delayed - Prior Pending Application(s) or Official
+                            Search(es)"
+                          customer_reference: "199706.00023/JOJA/HNDR"
+                          application_received_by: "20"
+                          lodged_by: "CMS CAMERON MCKENNA NABARRO OLSW
+
+                            1-3 CHARTER SQUARE
+
+                            SHEFFIELD
+
+                            S1 4HS"
+                      referred_to_documents: []
+                      register:
+                        type: "Register"
+                        type_code: "REGISTER"
+                        purchase_identifier: "register"
+                        availability: "available for immediate download"
+                        availability_code: "IMMEDIATE"
+                        backdated: true
+                        token_cost: 7
+                        previously_purchased: "2025-12-15T10:30:00Z"
+                      title_plan:
+                        type: "Plan"
+                        type_code: "TITLEPLAN"
+                        purchase_identifier: "title_plan"
+                        availability: "available for immediate download"
+                        availability_code: "IMMEDIATE"
+                        backdated: true
+                        token_cost: 7
+                        previously_purchased: null
+                    total_token_cost_estimate: 14
+                    current_balance: 150
+                withReferredDocuments:
+                  summary: Title with referred documents (e.g., deeds, charges)
+                  value:
+                    data:
+                      title_status: "Title number is valid."
+                      title_status_code: "VALID"
+                      title_number: "EF345678"
+                      pending_applications: []
+                      referred_to_documents:
+                        - type: "Charge"
+                          type_code: "CHARGE"
+                          purchase_identifier: "charge"
+                          entry_numbers: [ "C1" ]
+                          date: "2020-12-01"
+                          filed_under: "EF345678"
+                          availability: "available for immediate download"
+                          availability_code: "IMMEDIATE"
+                          plan_only: false
+                          token_cost: 7
+                          previously_purchased: "2025-11-20T14:22:00Z"
+                        - type: "Abstract"
+                          type_code: "ABSTRACT"
+                          purchase_identifier: null
+                          entry_numbers: [ "A1" ]
+                          date: "2019-03-15"
+                          filed_under: null
+                          availability: "requires further investigation"
+                          availability_code: "MANUAL"
+                          plan_only: true
+                          token_cost: 7
+                          previously_purchased: null
+                      register:
+                        type: "Register"
+                        type_code: "REGISTER"
+                        purchase_identifier: "register"
+                        availability: "available for immediate download"
+                        availability_code: "IMMEDIATE"
+                        backdated: false
+                        token_cost: 7
+                        previously_purchased: null
+                      title_plan:
+                        type: "Plan"
+                        type_code: "TITLEPLAN"
+                        purchase_identifier: "title_plan"
+                        availability: "available for immediate download"
+                        availability_code: "IMMEDIATE"
+                        backdated: false
+                        token_cost: 7
+                        previously_purchased: null
+                    total_token_cost_estimate: 28
+                    current_balance: 150
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Title not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                titleNumberNotFound:
+                  summary: Title number not found in HMLR registry
+                  value:
+                    error:
+                      code: "NOT_FOUND"
+                      message: "Title number not found"
+                titleIdNotFound:
+                  summary: Title ID not found in database
+                  value:
+                    error:
+                      code: "TITLE_ID_NOT_FOUND"
+                      message: "Title ID not found"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /subscribe:
+    post:
+      tags:
+        - Webhooks
+      summary: Subscribe to webhook notifications
+      description: |
+        Register a webhook endpoint to receive notifications when purchased documents are ready.
+
+        The subscription is associated with your authentication credentials. All subsequent
+        document purchases will automatically trigger webhook notifications to this endpoint.
+
+        **Important:** Save the returned `secret` immediately. It cannot be retrieved later
+        and is required to verify webhook signatures using HMAC-SHA256.
+
+        ## Webhook Delivery
+
+        When documents are ready, you'll receive:
+
+        ```http
+        POST {your_webhook_url}
+        Content-Type: application/json
+        X-Webhook-Signature: {base64_hmac_sha256_signature}
+        X-Webhook-Event: document.status_changed
+        X-Webhook-Id: {unique_event_id}
+        ```
+      operationId: subscribe
+      security:
+        - OAuth2: [ docs.webhooks.manage ]
+        - OAuth2ClientCredentials: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubscribeRequest"
+            examples:
+              subscription:
+                summary: Subscribe to webhook notifications
+                value:
+                  webhook_url: "https://customer.example.com/webhooks/documents"
+      responses:
+        "200":
+          description: Subscription created successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscribeResponse"
+              examples:
+                success:
+                  summary: Subscription created
+                  value:
+                    subscription_id: "8f8d2e40-1234-5678-9abc-def012345678"
+                    webhook_url: "https://customer.example.com/webhooks/documents"
+                    secret: "a7b3c9d2e5f8g1h4i7j0k3l6m9n2o5p8q1r4s7t0u3v6w9x2y5z8"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: Subscription already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                conflict:
+                  summary: Subscription already exists
+                  value:
+                    error:
+                      code: "SUBSCRIPTION_CONFLICT"
+                      message: "A subscription already exists for this account"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /subscriptions/{subscription_id}:
+    delete:
+      tags:
+        - Webhooks
+      summary: Cancel a webhook subscription
+      description: |
+        Cancel an active webhook subscription. Once cancelled, no further webhook
+        notifications will be delivered for new document purchases.
+      operationId: unsubscribe
+      security:
+        - OAuth2: [ docs.webhooks.manage ]
+        - OAuth2ClientCredentials: []
+      parameters:
+        - name: subscription_id
+          in: path
+          required: true
+          description: UUID of the subscription to cancel
+          schema:
+            type: string
+            format: uuid
+            examples:
+              - "8f8d2e40-1234-5678-9abc-def012345678"
+      responses:
+        "204":
+          description: Subscription cancelled successfully
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /webhooks/audit:
+    post:
+      tags:
+        - Webhooks
+      summary: Get webhook delivery audit log
+      description: |
+        Retrieve a paginated log of webhook delivery attempts for your subscriptions.
+        Useful for debugging missed or failed webhook deliveries.
+      operationId: getWebhookAudit
+      security:
+        - OAuth2: [ docs.read ]
+        - OAuth2ClientCredentials: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookAuditRequest"
+            examples:
+              lastWeek:
+                summary: Audit log for a specific date range
+                value:
+                  start_date: "2026-04-14T00:00:00Z"
+                  end_date: "2026-04-21T23:59:59Z"
+                  page_number: 1
+                  page_size: 20
+      responses:
+        "200":
+          description: Audit log retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookAuditResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /webhooks/events/{event_id}:
+    get:
+      tags:
+        - Webhooks
+      summary: Get webhook event delivery details
+      description: |
+        Retrieve all delivery attempts for a specific webhook event, including
+        HTTP response codes and error messages for each attempt.
+      operationId: getWebhookEventDetails
+      security:
+        - OAuth2: [ docs.read ]
+        - OAuth2ClientCredentials: []
+      parameters:
+        - name: event_id
+          in: path
+          required: true
+          description: UUID of the webhook event
+          schema:
+            type: string
+            format: uuid
+            examples:
+              - "550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        "200":
+          description: Event details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookEventDetailsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /webhooks/statistics:
+    post:
+      tags:
+        - Webhooks
+      summary: Get webhook delivery statistics
+      description: |
+        Retrieve delivery success/failure statistics for a date range.
+        Includes total attempts, success rate, and average delivery duration.
+      operationId: getWebhookStatistics
+      security:
+        - OAuth2: [ docs.read ]
+        - OAuth2ClientCredentials: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookStatisticsRequest"
+            examples:
+              lastMonth:
+                summary: Statistics for the last 30 days
+                value:
+                  start_date: "2026-03-22T00:00:00Z"
+                  end_date: "2026-04-21T23:59:59Z"
+      responses:
+        "200":
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookStatisticsResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /purchase:
+    post:
+      tags:
+        - Documents
+      summary: Purchase documents
+      description: |
+        Purchase one or more documents for a title.
+
+        **Prerequisites:**
+        - Must have subscribed to webhooks via `POST /subscribe`
+        - Sufficient token balance in account
+
+        This endpoint:
+        - Validates document availability with the document provider
+        - Checks account balance
+        - Deducts tokens from your account via the Ledger API
+        - Creates order in backend system
+        - Returns immediately with an order ID
+
+        Documents are delivered asynchronously to your subscribed webhook URL when ready.
+      operationId: purchaseDocuments
+      security:
+        - OAuth2: [ docs.purchase ]
+        - OAuth2ClientCredentials: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PurchaseRequest"
+            examples:
+              standardPurchase:
+                summary: Purchase register and title plan
+                value:
+                  title_number: "AB123456"
+                  documents:
+                    - "register"
+                    - "title_plan"
+                  customer_reference: "CUST-ORDER-12345"
+      responses:
+        "201":
+          description: Order created successfully and processing started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PurchaseResponse"
+              examples:
+                success:
+                  summary: Successful purchase
+                  value:
+                    order_id: "770e8400-e29b-41d4-a716-446655440002"
+                    status: "PROCESSING"
+                    title_number: "AB123456"
+                    documents_ordered:
+                      - "register"
+                      - "title_plan"
+                    total_tokens_charged: 14
+                    new_balance: 136
+                    estimated_delivery: "2026-01-15T14:35:00Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+        "409":
+          description: |-
+            Duplicate order in progress.
+
+            This occurs when ANY of the requested documents are already being processed in another order
+            (status: PENDING_PAYMENT or PROCESSING) for the same title.
+
+            The response will indicate which documents are in progress and in which order(s).
+            You should either:
+            - Wait for the existing order(s) to complete, then order again
+            - Modify your request to exclude the documents that are in progress
+
+            **Note:** Documents that were previously purchased and delivered CAN be purchased again,
+            as they may be out of date. The 'previously_purchased' field in the availability check
+            is informational only to help you decide, but does not prevent repurchasing.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                allDocumentsInProgress:
+                  summary: All requested documents in progress
+                  value:
+                    error:
+                      code: "DOCUMENTS_IN_PROGRESS"
+                      message: "One or more requested documents are already being processed"
+                      details:
+                        documents_in_progress:
+                          - document_id: "register"
+                            order_id: "770e8400-e29b-41d4-a716-446655440002"
+                            order_status: "PROCESSING"
+                          - document_id: "title_plan"
+                            order_id: "770e8400-e29b-41d4-a716-446655440002"
+                            order_status: "PROCESSING"
+                someDocumentsInProgress:
+                  summary: Partial conflict - some documents in progress
+                  value:
+                    error:
+                      code: "DOCUMENTS_IN_PROGRESS"
+                      message: "One or more requested documents are already being processed"
+                      details:
+                        documents_in_progress:
+                          - document_id: "register"
+                            order_id: "770e8400-e29b-41d4-a716-446655440002"
+                            order_status: "PROCESSING"
+                        documents_available:
+                          - "title_plan"
+                          - "ref_doc_001"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /orders/{order_id}:
+    get:
+      tags:
+        - Orders
+      summary: Get order status
+      description: |
+        Retrieve the current status of a document order.
+
+        Order statuses:
+        - `PENDING_PAYMENT`: Payment is being processed
+        - `PROCESSING`: Documents are being ordered from the provider
+        - `COMPLETED`: Documents have been delivered to webhook
+        - `FAILED`: Order failed (see error_message)
+        - `WEBHOOK_FAILED`: Documents ready but webhook delivery failed
+      operationId: getOrderStatus
+      security:
+        - OAuth2: [ docs.read ]
+        - OAuth2ClientCredentials: []
+      parameters:
+        - name: order_id
+          in: path
+          required: true
+          description: The unique identifier of the order
+          schema:
+            type: string
+            format: uuid
+          example: "770e8400-e29b-41d4-a716-446655440002"
+      responses:
+        "200":
+          description: Order status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderStatusResponse"
+              examples:
+                completed:
+                  summary: Completed order
+                  value:
+                    order_id: "770e8400-e29b-41d4-a716-446655440002"
+                    status: "COMPLETED"
+                    title_number: "AB123456"
+                    customer_reference: "CUST-ORDER-12345"
+                    documents_ordered:
+                      - "register"
+                      - "title_plan"
+                    documents_delivered:
+                      - document_type_id: "register"
+                        document_id: "990e8400-e29b-41d4-a716-446655440003"
+                        status: "DELIVERED"
+                        webhook_delivery_status: "SUCCESS"
+                        webhook_delivery_attempts: 1
+                      - document_type_id: "title_plan"
+                        document_id: "991e8400-e29b-41d4-a716-446655440004"
+                        status: "DELIVERED"
+                        webhook_delivery_status: "SUCCESS"
+                        webhook_delivery_attempts: 1
+                    total_tokens_charged: 14
+                    created_at: "2026-01-15T14:30:00Z"
+                    completed_at: "2026-01-15T14:32:15Z"
+                processing:
+                  summary: Order still processing
+                  value:
+                    order_id: "770e8400-e29b-41d4-a716-446655440002"
+                    status: "PROCESSING"
+                    title_number: "AB123456"
+                    customer_reference: "CUST-ORDER-12345"
+                    documents_ordered:
+                      - "register"
+                      - "title_plan"
+                    documents_delivered:
+                      - document_type_id: "register"
+                        status: "PENDING"
+                        webhook_delivery_status: null
+                        webhook_delivery_attempts: 0
+                      - document_type_id: "title_plan"
+                        status: "PENDING"
+                        webhook_delivery_status: null
+                        webhook_delivery_attempts: 0
+                    total_tokens_charged: 14
+                    created_at: "2026-01-15T14:30:00Z"
+                    completed_at: null
+                webhookFailed:
+                  summary: Documents ready but webhook failed
+                  value:
+                    order_id: "770e8400-e29b-41d4-a716-446655440002"
+                    status: "WEBHOOK_FAILED"
+                    title_number: "AB123456"
+                    customer_reference: "CUST-ORDER-12345"
+                    documents_ordered:
+                      - "register"
+                      - "title_plan"
+                    documents_delivered:
+                      - document_type_id: "register"
+                        document_id: "990e8400-e29b-41d4-a716-446655440003"
+                        status: "DOWNLOADED"
+                        webhook_delivery_status: "FAILED"
+                        webhook_delivery_attempts: 4
+                      - document_type_id: "title_plan"
+                        document_id: "991e8400-e29b-41d4-a716-446655440004"
+                        status: "DOWNLOADED"
+                        webhook_delivery_status: "FAILED"
+                        webhook_delivery_attempts: 4
+                    total_tokens_charged: 14
+                    error_message: "Webhook delivery failed after 4 attempts: Connection timeout"
+                    created_at: "2026-01-15T14:30:00Z"
+                    completed_at: null
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Order not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "ORDER_NOT_FOUND"
+                  message: "The specified order was not found"
+                  details:
+                    order_id: "770e8400-e29b-41d4-a716-446655440002"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /download/{document_id}:
+    get:
+      tags:
+        - Documents
+      summary: Download a purchased document
+      description: |
+        Download a document from a completed order using its unique document ID.
+
+        This endpoint allows you to:
+        - Re-download documents that were previously delivered via webhook
+        - Download documents when webhook delivery failed
+        - Access documents from past orders
+
+        **No additional charge** - You've already paid for the document.
+
+        Documents are stored indefinitely so you can always re-download your previously purchased documents.
+
+        **Getting the document_id:** The unique document ID is provided in the order status response
+        after the document has been downloaded. Use the `document_id` field (UUID) from the DocumentDeliveryStatus.
+      operationId: downloadDocument
+      security:
+        - OAuth2: [ docs.read ]
+        - OAuth2ClientCredentials: []
+      parameters:
+        - name: document_id
+          in: path
+          required: true
+          description: The unique document ID for the document (UUID from order status
+            response)
+          schema:
+            type: string
+            format: uuid
+          example: "990e8400-e29b-41d4-a716-446655440003"
+      responses:
+        "200":
+          description: Document retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentDownloadResponse"
+              examples:
+                pdfDocument:
+                  summary: PDF document download
+                  value:
+                    document_id: "990e8400-e29b-41d4-a716-446655440003"
+                    document_type_code: "REGISTER"
+                    format: "pdf"
+                    content: "JVBERi0xLjQKJeLjz9MK..."
+                    metadata:
+                      filename: "DN123456-Register.pdf"
+                      file_size_bytes: 245680
+                    downloaded_at: "2026-01-15T14:32:15Z"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          description: Order or document not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                documentNotFound:
+                  summary: Document not found
+                  value:
+                    error:
+                      code: "DOCUMENT_NOT_FOUND"
+                      message: "The specified document was not found or you don't have access to it"
+                      details:
+                        document_id: "990e8400-e29b-41d4-a716-446655440003"
+        "422":
+          description: Document not yet ready for download
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "DOCUMENT_NOT_READY"
+                  message: "The document is still being processed and is not yet available for
+                    download"
+                  details:
+                    document_id: "990e8400-e29b-41d4-a716-446655440003"
+                    status: "ORDERED"
+                    estimated_ready: "2026-01-15T14:35:00Z"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /verify-ownership:
+    post:
+      tags:
+        - Documents
+      summary: Verify ownership of a title
+      description: |
+        Verify if a named person is the registered proprietor of a property title using HMLR's Online Owner Verification (OOV) service.
+
+        **Cost**: This endpoint charges **1 token** per verification.
+
+        This endpoint:
+        - Verifies if the person you specify matches the registered proprietor(s)
+        - Returns match status: SINGLE_MATCH, MULTIPLE_MATCHES, or NO_MATCHES
+        - Provides detailed match quality for partial matches
+        - Useful for identity verification, AML/KYC checks, and pre-transaction due diligence
+        - Deducts 1 token from your account balance after successful verification
+
+        **This is a verification service**, not a discovery service. You must provide the person's name to verify.
+        To discover who owns a property, purchase and review the Official Copy of the Register.
+
+      operationId: verifyOwnership
+      security:
+        - OAuth2: [ docs.purchase ]
+        - OAuth2ClientCredentials: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OwnershipVerificationRequest"
+            examples:
+              verifyIndividual:
+                summary: Verify individual ownership
+                value:
+                  title_number: "BK126329"
+                  first_forename: "Nicolas"
+                  surname: "Neate"
+                  customer_reference: "VERIFY-001"
+              verifyWithMiddleName:
+                summary: Verify with middle name
+                value:
+                  title_number: "AB123456"
+                  first_forename: "John"
+                  middle_name: "Paul"
+                  surname: "Smith"
+                  customer_reference: "VERIFY-002"
+      responses:
+        "200":
+          description: Ownership verification completed successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OwnershipVerificationResponse"
+              examples:
+                exactMatch:
+                  summary: Exact match - person is registered proprietor
+                  value:
+                    verification_id: "eoov-a6d8f57f84c4"
+                    title_number: "BK126329"
+                    match_result: "SINGLE_MATCH"
+                    property_address:
+                      building_number: "4"
+                      street_name: "Ridgeway"
+                      city_name: "Reading"
+                      postcode: "RG10 8AS"
+                      tenure: "freehold"
+                    surname_match: "MATCH"
+                    forename_match: "MATCH"
+                    middle_name_match: "NO_MATCH"
+                    match_information:
+                      historical_match: false
+                      ownership_type: "Joint"
+                    customer_reference: "VERIFY-001"
+                    tokens_charged: 1
+                    new_balance: 149
+                    verified_at: "2026-02-25T21:04:35Z"
+                partialMatch:
+                  summary: Partial match - similar name found
+                  value:
+                    verification_id: "eoov-6ac210c274d1"
+                    title_number: "BK126329"
+                    match_result: "SINGLE_MATCH"
+                    property_address:
+                      building_number: "4"
+                      street_name: "Ridgeway"
+                      city_name: "Reading"
+                      postcode: "RG10 8AS"
+                      tenure: "freehold"
+                    surname_match: "MATCH"
+                    forename_match: "PARTIAL_MATCH"
+                    forename_match_details:
+                      forename_initial: true
+                      forename_sound: false
+                      forename_distance: false
+                    middle_name_match: "NO_MATCH"
+                    match_information:
+                      historical_match: false
+                      ownership_type: "Joint"
+                    customer_reference: "VERIFY-002"
+                    tokens_charged: 1
+                    new_balance: 149
+                    verified_at: "2026-02-25T21:04:36Z"
+                noMatch:
+                  summary: No match - person is not registered proprietor
+                  value:
+                    verification_id: "eoov-8ef32c42585e"
+                    title_number: "DN100"
+                    match_result: "NO_MATCHES"
+                    property_address:
+                      building_number: "48"
+                      street_name: "Moorland View"
+                      city_name: "Newton Abbot"
+                      postcode: "TQ12 4EP"
+                      tenure: "freehold"
+                    surname_match: "NO_MATCH"
+                    forename_match: "SKIPPED"
+                    middle_name_match: "SKIPPED"
+                    customer_reference: "VERIFY-003"
+                    tokens_charged: 1
+                    new_balance: 149
+                    verified_at: "2026-02-25T21:04:37Z"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "402":
+          description: Insufficient token balance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "INSUFFICIENT_BALANCE"
+                  message: "Insufficient token balance"
+                  details:
+                    required: 1
+                    available: 0
+                    shortfall: 1
+        "404":
+          description: Title not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: "TITLE_NOT_FOUND"
+                  message: "The specified title number was not found"
+                  details:
+                    title_number: "ZZ999999"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check endpoint
+      description: |
+        Check the health status of the API service and its dependencies.
+
+        Returns 200 if all systems are operational.
+        Returns 503 if any critical dependency is unavailable.
+      operationId: healthCheck
+      security: [] # No authentication required
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: "healthy"
+                timestamp: "2026-01-15T14:30:00Z"
+                checks:
+                  database: "ok"
+                  redis: "ok"
+                  document_provider: "ok"
+                  ledger_api: "ok"
+        "503":
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: "unhealthy"
+                timestamp: "2026-01-15T14:30:00Z"
+                checks:
+                  database: "ok"
+                  redis: "ok"
+                  document_provider: "error"
+                  ledger_api: "ok"
+
+components:
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      description: |
+        OAuth 2.0 delegated user flow. Users authenticate with their credentials and your
+        server calls the API on their behalf. The access token must be included in the
+        Authorization header as a Bearer token.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://login.microsoftonline.com/d2a91423-0dc1-4853-8515-7b7b7d262791/v2.0/authorize
+          tokenUrl: https://login.microsoftonline.com/d2a91423-0dc1-4853-8515-7b7b7d262791/oauth2/v2.0/token
+          refreshUrl: https://login.microsoftonline.com/d2a91423-0dc1-4853-8515-7b7b7d262791/oauth2/v2.0/token
+          scopes:
+            docs.read: Read document availability and order information
+            docs.purchase: Purchase documents and check ownership
+            docs.webhooks.manage: Manage webhook subscriptions
+    OAuth2ClientCredentials:
+      type: oauth2
+      description: |
+        OAuth 2.0 client credentials (S2S) flow. Your server authenticates directly using
+        an Entra ID application identity — no end-user credentials required.
+
+        Token acquisition: request `{document-api-app-id}/.default` using the
+        client credentials grant. Entra will issue a token containing `roles` claims
+        based on the app roles granted to your registration by Nimbus.
+
+        App roles and the endpoints they authorize:
+          - `docs.app.read` — GET /check-availability, GET /orders/{id}, GET /download/{id},
+            webhook audit/statistics endpoints
+          - `docs.app.purchase` — POST /purchase, POST /verify-ownership
+          - `docs.app.webhooks.manage` — POST /subscribe, DELETE /subscriptions/{id}
+
+        Note: these role names appear in the token's `roles` claim. They are never
+        passed as `scope` values in the token request — always use `/.default`.
+      flows:
+        clientCredentials:
+          tokenUrl: https://login.microsoftonline.com/d2a91423-0dc1-4853-8515-7b7b7d262791/oauth2/v2.0/token
+          scopes:
+            /.default: Requests all app roles granted to your Entra app registration
+
+  schemas:
+    DocumentTypeIdentifier:
+      type: string
+      description: Document type identifier used in `/purchase` requests and returned as `purchase_identifier` in `/check-availability` responses.
+      enum:
+        - register
+        - title_plan
+        - lease_document
+        - conveyance
+        - deed
+        - transfer
+        - charge
+        - nimbus_maps
+        - property_report
+        - availability_report
+        - location_report
+        - relevant_activity_report
+        - high_impact_planning_applications_report
+        - commercial_comps_leasehold
+        - commercial_comps_freehold
+        - investment_comps
+        - residential_comps
+        - other_holdings
+        - flood_risk
+        - kml
+        - site_report_basic
+        - site_report_advanced
+
+    AvailabilityCheckRequest:
+      type: object
+      properties:
+        title_number:
+          type: string
+          description: UK Land Registry title number. Either title_number or title_id must
+            be provided.
+          pattern: "^[A-Z]{1,3}[0-9]{1,7}$"
+          examples:
+            - "AB123456"
+          minLength: 2
+          maxLength: 10
+        title_id:
+          type: string
+          format: uuid
+          description: Internal UUID identifier for the title. Either title_number or
+            title_id must be provided.
+          examples:
+            - "0000a942-3cee-431d-bd71-d07cb27197ec"
+      oneOf:
+        - required: [ title_number ]
+        - required: [ title_id ]
+
+    AvailabilityCheckResponse:
+      type: object
+      required:
+        - data
+        - total_token_cost_estimate
+        - current_balance
+      properties:
+        data:
+          $ref: "#/components/schemas/AvailabilityCheckData"
+        total_token_cost_estimate:
+          type: integer
+          description: Total cost in tokens if all documents are purchased
+          examples:
+            - 21
+          minimum: 0
+        current_balance:
+          type: integer
+          description: Current token balance for this account
+          examples:
+            - 150
+          minimum: 0
+
+    AvailabilityCheckData:
+      type: object
+      required:
+        - title_status
+        - title_status_code
+        - title_number
+        - pending_applications
+        - referred_to_documents
+        - register
+        - title_plan
+      properties:
+        title_status:
+          type: string
+          description: Human-readable status message from HMLR
+          examples:
+            - "Title number is valid."
+        title_status_code:
+          type: string
+          enum:
+            - VALID
+            - PENDING_APPLICATIONS
+            - CLOSED
+            - INVALID
+            - CLOSED_AND_CONTINUED
+            - NOT_COMPUTERISED
+            - PENDING_DEALING
+            - PENDING_FIRST
+            - SCHEME
+          description: Status code from HMLR
+          examples:
+            - "VALID"
+        title_number:
+          type: string
+          description: The title number that was checked
+          examples:
+            - "AB123456"
+        pending_applications:
+          type: array
+          description: List of pending applications from HMLR Application Enquiry API
+          items:
+            $ref: "#/components/schemas/PendingApplication"
+        referred_to_documents:
+          type: array
+          description: List of referred documents (deeds, charges, leases, etc.)
+          items:
+            $ref: "#/components/schemas/ReferredDocument"
+        register:
+          $ref: "#/components/schemas/StandardDocument"
+        title_plan:
+          $ref: "#/components/schemas/StandardDocument"
+
+    StandardDocument:
+      type: object
+      required:
+        - type
+        - type_code
+        - purchase_identifier
+        - availability
+        - availability_code
+        - backdated
+        - token_cost
+        - previously_purchased
+      properties:
+        type:
+          type: string
+          enum: [ Register, Plan ]
+          description: Document type name
+          examples:
+            - "Register"
+            - "Plan"
+        type_code:
+          type: string
+          description: HMLR's internal document type code. This is not the value to use in `/purchase` — use `purchase_identifier` instead.
+          examples:
+            - "REGISTER"
+            - "TITLEPLAN"
+        purchase_identifier:
+          $ref: "#/components/schemas/DocumentTypeIdentifier"
+          description: The identifier to pass in the `documents` array when calling `/purchase` for this document.
+        availability:
+          type: string
+          description: Availability status message from HMLR
+          examples:
+            - "available for immediate download"
+        availability_code:
+          type: string
+          enum: [ IMMEDIATE, MANUAL, UNAVAILABLE ]
+          description: |
+            Availability status code:
+            - IMMEDIATE: Available for immediate download
+            - MANUAL: Requires manual processing/further investigation
+            - UNAVAILABLE: Not available
+          examples:
+            - "IMMEDIATE"
+        backdated:
+          type: boolean
+          description: Whether the document is backdated (due to pending applications)
+          examples:
+            - false
+        token_cost:
+          type: integer
+          description: Cost in tokens for this document
+          examples:
+            - 7
+          minimum: 0
+        previously_purchased:
+          type: string
+          format: date-time
+          nullable: true
+          description: |-
+            ISO 8601 timestamp when this customer previously purchased this document, or null if never purchased.
+            This is informational only - you can still purchase the document again as it may be out of date.
+          examples:
+            - null
+
+    ReferredDocument:
+      type: object
+      required:
+        - type
+        - type_code
+        - purchase_identifier
+        - entry_numbers
+        - availability
+        - availability_code
+        - plan_only
+        - token_cost
+        - previously_purchased
+      properties:
+        type:
+          type: string
+          description: Human-readable document type (e.g., "Charge", "Deed", "Lease")
+          examples:
+            - "Charge"
+        type_code:
+          type: string
+          description: HMLR's internal document type code. This is not the value to use in `/purchase` — use `purchase_identifier` instead.
+          examples:
+            - "CHARGE"
+        purchase_identifier:
+          oneOf:
+            - $ref: "#/components/schemas/DocumentTypeIdentifier"
+            - type: "null"
+          description: |-
+            The identifier to pass in the `documents` array when calling `/purchase` for this document.
+            Null if the document cannot be purchased via the API (e.g., availability_code is MANUAL or UNAVAILABLE).
+          examples:
+            - "charge"
+            - null
+        entry_numbers:
+          type: array
+          description: Register entry numbers where this document is referred to
+          items:
+            type: string
+          examples:
+            - [ "C1" ]
+        date:
+          type: string
+          format: date
+          nullable: true
+          description: Date of the referred document
+          examples:
+            - "2020-12-01"
+        filed_under:
+          type: string
+          nullable: true
+          description: Title number under which the document is filed
+          pattern: "^[A-Z0-9]{1,9}$"
+          examples:
+            - "AB123456"
+        availability:
+          type: string
+          description: Availability status message from HMLR
+          examples:
+            - "available for immediate download"
+        availability_code:
+          type: string
+          enum: [ IMMEDIATE, MANUAL, UNAVAILABLE ]
+          description: |
+            Availability status code:
+            - IMMEDIATE: Available for immediate download
+            - MANUAL: Requires manual processing/further investigation
+            - UNAVAILABLE: Not available
+          examples:
+            - "IMMEDIATE"
+        plan_only:
+          type: boolean
+          description: Whether the document contains only a plan, not the complete document
+          examples:
+            - false
+        token_cost:
+          type: integer
+          description: Cost in tokens for this document
+          examples:
+            - 7
+          minimum: 0
+        previously_purchased:
+          type: string
+          format: date-time
+          nullable: true
+          description: |-
+            ISO 8601 timestamp when this customer previously purchased this document, or null if never purchased.
+            This is informational only - you can still purchase the document again as it may be out of date.
+          examples:
+            - "2025-11-20T14:22:00Z"
+
+    PendingApplication:
+      type: object
+      required:
+        - application_type
+        - application_type_description
+        - expedited
+        - application_reference
+        - priority_date
+        - priority_time
+        - application_progress
+        - customer_reference
+        - application_received_by
+        - lodged_by
+      properties:
+        application_type:
+          type: string
+          description: HMLR application type code (e.g., "30", "50")
+          examples:
+            - "50"
+        application_type_description:
+          type: string
+          description: Human-readable description of the application type
+          examples:
+            - "Dispositionary First Lease (Old Title)"
+        expedited:
+          type: string
+          description: Whether the application is expedited ("true" or "false" as string)
+          enum: [ "true", "false" ]
+          examples:
+            - "false"
+        application_reference:
+          type: string
+          description: HMLR application reference number
+          examples:
+            - "FA8480F"
+        priority_date:
+          type: string
+          format: date
+          description: Priority date of the application (YYYY-MM-DD)
+          examples:
+            - "2025-12-29"
+        priority_time:
+          type: string
+          description: Priority time of the application (HH:MM:SS)
+          pattern: "^\\d{2}:\\d{2}:\\d{2}$"
+          examples:
+            - "06:08:45"
+        application_progress:
+          type: string
+          description: Current progress status of the application
+          examples:
+            - "Received: Priority Protected"
+        customer_reference:
+          type: string
+          description: Customer's reference for the application
+          examples:
+            - "VH/ID57587"
+        application_received_by:
+          type: string
+          description: How the application was received (e.g., "10" for postal, "20" for
+            electronic, "30" for fax)
+          examples:
+            - "20"
+        lodged_by:
+          type: string
+          description: Name and address of the party who lodged the application (may
+            contain newlines)
+          examples:
+            - "SPENCER WEST LLP
+
+              LONGBOW HOUSE
+
+              20 CHISWELL STREET
+
+              LONDON
+
+              EC1Y 4TW"
+
+    PurchaseRequest:
+      type: object
+      required:
+        - title_number
+        - documents
+      properties:
+        title_number:
+          type: string
+          description: UK Land Registry title number
+          pattern: "^[A-Z]{1,3}[0-9]{1,7}$"
+          examples:
+            - "AB123456"
+        documents:
+          type: array
+          description: |-
+            List of document identifiers to purchase. Use the `purchase_identifier` field from each
+            document in the `/check-availability` response. Note: `purchase_identifier` is not the
+            same as `type_code` — do not use the HMLR type code (e.g. "REGISTER") here.
+          items:
+            $ref: "#/components/schemas/DocumentTypeIdentifier"
+          minItems: 1
+          examples:
+            - [ "register", "title_plan" ]
+        customer_reference:
+          type: string
+          description: Your internal reference for this order
+          examples:
+            - "CUST-ORDER-12345"
+          maxLength: 255
+
+    PurchaseResponse:
+      type: object
+      required:
+        - order_id
+        - status
+        - title_number
+        - documents_ordered
+        - total_tokens_charged
+        - new_balance
+      properties:
+        order_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this order
+          examples:
+            - "770e8400-e29b-41d4-a716-446655440002"
+        status:
+          type: string
+          enum: [ PENDING_PAYMENT, PROCESSING ]
+          description: Current order status
+          examples:
+            - "PROCESSING"
+        title_number:
+          type: string
+          description: The title number for this order
+          examples:
+            - "AB123456"
+        documents_ordered:
+          type: array
+          description: List of document IDs that will be ordered and delivered
+          items:
+            type: string
+          examples:
+            - [ "register", "title_plan" ]
+        total_tokens_charged:
+          type: integer
+          description: Total tokens deducted from account (only for documents_ordered, not
+            excluded ones)
+          examples:
+            - 14
+          minimum: 0
+        new_balance:
+          type: integer
+          description: New account balance after charge
+          examples:
+            - 144
+          minimum: 0
+        estimated_delivery:
+          type: string
+          format: date-time
+          description: Estimated time when documents will be delivered
+          examples:
+            - "2026-01-15T14:35:00Z"
+
+    SubscribeRequest:
+      type: object
+      required:
+        - webhook_url
+      properties:
+        webhook_url:
+          type: string
+          format: uri
+          description: |
+            HTTPS URL where order completion webhooks will be delivered.
+
+            Requirements:
+            - Must use HTTPS (not HTTP)
+            - Must be publicly accessible
+            - Must not be localhost/127.0.0.1
+            - Should respond within 30 seconds
+            - Should return 2xx status for successful delivery
+
+            The webhook will receive POST requests with:
+            - Content-Type: application/json
+            - X-Webhook-Signature: HMAC-SHA256 signature for verification
+            - Body: Order completion details (OrderStatusResponse)
+          examples:
+            - "https://api.example.com/webhooks/land-registry"
+
+    SubscribeResponse:
+      type: object
+      required:
+        - subscription_id
+        - webhook_url
+        - secret
+      properties:
+        subscription_id:
+          type: string
+          format: uuid
+          description: |
+            Unique identifier for the subscription.
+            This is generated by the backend system and passed through.
+          examples:
+            - "8f8d2e40-1234-5678-9abc-def012345678"
+        webhook_url:
+          type: string
+          format: uri
+          description: The webhook URL that was registered
+          examples:
+            - "https://api.example.com/webhooks/land-registry"
+        secret:
+          type: string
+          description: |
+            Secret key for webhook signature verification.
+
+            **Important:** Store this value securely - it cannot be retrieved later.
+            Use this secret to verify HMAC-SHA256 signatures in the X-Webhook-Signature
+            header of incoming webhook requests.
+          examples:
+            - "a7b3c9d2e5f8g1h4i7j0k3l6m9n2o5p8q1r4s7t0u3v6w9x2y5z8"
+
+    OrderStatusResponse:
+      type: object
+      required:
+        - order_id
+        - status
+        - title_number
+        - documents_ordered
+        - documents_delivered
+        - total_tokens_charged
+        - created_at
+      properties:
+        order_id:
+          type: string
+          format: uuid
+          description: Unique identifier for this order
+          examples:
+            - "770e8400-e29b-41d4-a716-446655440002"
+        status:
+          type: string
+          enum: [ PENDING_PAYMENT, PROCESSING, COMPLETED, FAILED, WEBHOOK_FAILED ]
+          description: Current order status
+          examples:
+            - "COMPLETED"
+        title_number:
+          type: string
+          description: The title number for this order
+          examples:
+            - "AB123456"
+        customer_reference:
+          type: string
+          description: Customer's reference for this order
+          examples:
+            - "CUST-ORDER-12345"
+        documents_ordered:
+          type: array
+          description: List of document IDs in this order
+          items:
+            type: string
+          examples:
+            - [ "register", "title_plan" ]
+        documents_delivered:
+          type: array
+          description: Delivery status of each document
+          items:
+            $ref: "#/components/schemas/DocumentDeliveryStatus"
+        total_tokens_charged:
+          type: integer
+          description: Total tokens charged for this order
+          examples:
+            - 6
+          minimum: 0
+        error_message:
+          type: string
+          description: Error message if order failed
+          examples:
+            - "Document provider service unavailable"
+        created_at:
+          type: string
+          format: date-time
+          description: When the order was created
+          examples:
+            - "2026-01-15T14:30:00Z"
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the order was completed
+          examples:
+            - "2026-01-15T14:32:15Z"
+
+    DocumentDeliveryStatus:
+      type: object
+      required:
+        - document_type_id
+        - status
+      properties:
+        document_type_id:
+          type: string
+          description: Document type identifier (e.g., "register", "title_plan",
+            "ref_doc_001")
+          examples:
+            - "register"
+        document_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Unique document ID for this document. Available once status is
+            DOWNLOADED or DELIVERED. Use this ID with the download endpoint.
+          examples:
+            - "990e8400-e29b-41d4-a716-446655440003"
+        status:
+          type: string
+          enum: [ PENDING, ORDERED, DOWNLOADED, DELIVERED, FAILED ]
+          description: Current status of this document
+          examples:
+            - "DELIVERED"
+        webhook_delivery_status:
+          type: string
+          enum: [ SUCCESS, FAILED, PENDING ]
+          nullable: true
+          description: Status of webhook delivery for this document
+          examples:
+            - "SUCCESS"
+        webhook_delivery_attempts:
+          type: integer
+          description: Number of webhook delivery attempts made for this document
+          examples:
+            - 1
+          minimum: 0
+
+    DocumentDownloadResponse:
+      type: object
+      required:
+        - document_id
+        - document_type_code
+        - format
+        - content
+        - downloaded_at
+      properties:
+        document_id:
+          type: string
+          format: uuid
+          description: Unique document identifier for this document
+          examples:
+            - "990e8400-e29b-41d4-a716-446655440003"
+        document_type_code:
+          type: string
+          description: Document type code (REGISTER, TITLEPLAN, DOCUMENT, etc.)
+          examples:
+            - "REGISTER"
+        format:
+          type: string
+          enum: [ pdf, xml ]
+          description: Document format
+          examples:
+            - "pdf"
+        content:
+          type: string
+          format: byte
+          description: Base64-encoded document content
+          examples:
+            - "JVBERi0xLjQKJeLjz9MK..."
+        metadata:
+          type: object
+          description: Additional document metadata
+          properties:
+            filename:
+              type: string
+              description: Original filename from the document provider
+              examples:
+                - "DN123456-Register.pdf"
+            file_size_bytes:
+              type: integer
+              description: Size of the document in bytes
+              examples:
+                - 245680
+        downloaded_at:
+          type: string
+          format: date-time
+          description: When the document was originally downloaded from the document
+            provider
+          examples:
+            - "2026-01-15T14:32:15Z"
+
+    OwnershipVerificationRequest:
+      type: object
+      required:
+        - title_number
+        - first_forename
+        - surname
+      properties:
+        title_number:
+          type: string
+          description: UK Land Registry title number
+          pattern: "^[A-Z]{1,3}[0-9]{1,7}$"
+          examples:
+            - "BK126329"
+          minLength: 1
+          maxLength: 9
+        first_forename:
+          type: string
+          description: First forename of the person to verify
+          pattern: "^[a-zA-Z0-9\\-']+$"
+          minLength: 1
+          examples:
+            - "Nicolas"
+        middle_name:
+          type: string
+          description: Middle name(s) of the person to verify (optional)
+          pattern: "^[a-zA-Z0-9\\-\\s']+$"
+          minLength: 1
+          examples:
+            - "Paul"
+        surname:
+          type: string
+          description: Surname of the person to verify
+          pattern: "^[a-zA-Z0-9\\-\\s']+$"
+          minLength: 1
+          examples:
+            - "Neate"
+        customer_reference:
+          type: string
+          description: Your reference for tracking this ownership verification
+          pattern: "^[A-Za-z0-9\\s~!\"@#$%'()*+,\\-./:;=>?\\[\\\\\\]_\\{\\}\\^£&]*$"
+          maxLength: 25
+          examples:
+            - "VERIFY-001"
+
+    OwnershipVerificationResponse:
+      type: object
+      required:
+        - verification_id
+        - title_number
+        - match_result
+        - tokens_charged
+        - new_balance
+        - verified_at
+      properties:
+        verification_id:
+          type: string
+          description: Unique identifier for this verification request
+          examples:
+            - "eoov-a6d8f57f84c4"
+        title_number:
+          type: string
+          description: The title number that was verified
+          examples:
+            - "BK126329"
+        match_result:
+          type: string
+          enum: [ NO_MATCHES, SINGLE_MATCH, MULTIPLE_MATCHES ]
+          description: |
+            Overall match result:
+            - NO_MATCHES: The named person is not a registered proprietor
+            - SINGLE_MATCH: The named person matches one registered proprietor
+            - MULTIPLE_MATCHES: The named person matches multiple registered proprietors
+          examples:
+            - "SINGLE_MATCH"
+        property_address:
+          type: object
+          description: Property address information
+          properties:
+            building_name:
+              type: string
+              nullable: true
+            building_number:
+              type: string
+              nullable: true
+            street_name:
+              type: string
+              nullable: true
+            city_name:
+              type: string
+              nullable: true
+            postcode:
+              type: string
+              nullable: true
+            tenure:
+              type: string
+              description: Property tenure (freehold or leasehold)
+        surname_match:
+          type: string
+          enum: [ MATCH, NO_MATCH, PARTIAL_MATCH, SKIPPED ]
+          description: Match quality for surname
+          examples:
+            - "MATCH"
+        forename_match:
+          type: string
+          enum: [ MATCH, NO_MATCH, PARTIAL_MATCH, SKIPPED ]
+          description: Match quality for first forename
+          examples:
+            - "MATCH"
+        forename_match_details:
+          type: object
+          description: Detailed forename match information (present when forename_match is
+            PARTIAL_MATCH)
+          properties:
+            forename_initial:
+              type: boolean
+              description: Whether the forename matches the initial
+            forename_sound:
+              type: boolean
+              description: Whether the forename sounds similar (phonetic match)
+            forename_distance:
+              type: boolean
+              description: Whether the forename has small edit distance (Levenshtein)
+            forename_middle:
+              type: boolean
+              description: Whether the forename matches middle name
+            forename_alias:
+              type: boolean
+              description: Whether the forename is a known alias
+        middle_name_match:
+          type: string
+          enum: [ MATCH, NO_MATCH, PARTIAL_MATCH, SKIPPED ]
+          nullable: true
+          description: Match quality for middle name (if provided)
+          examples:
+            - "NO_MATCH"
+        middle_name_match_details:
+          type: object
+          description: Detailed middle name match information (present when
+            middle_name_match is PARTIAL_MATCH)
+          properties:
+            midname_initial:
+              type: boolean
+            midname_sound:
+              type: boolean
+            midname_distance:
+              type: boolean
+        match_information:
+          type: object
+          description: Additional match metadata
+          properties:
+            historical_match:
+              type: boolean
+              description: Whether this is a match against a historical proprietor
+            ownership_type:
+              type: string
+              enum: [ Sole, Joint ]
+              description: Type of ownership (Sole or Joint)
+            proprietor_from:
+              type: string
+              description: Date from which the person has been proprietor
+            proprietor_to:
+              type: string
+              description: Date until which the person was proprietor (for historical matches)
+        customer_reference:
+          type: string
+          nullable: true
+          description: Your reference that was provided in the request
+          examples:
+            - "VERIFY-001"
+        tokens_charged:
+          type: integer
+          description: Number of tokens charged for this verification (always 1)
+          examples:
+            - 1
+        new_balance:
+          type: integer
+          description: Your token balance after this verification
+          examples:
+            - 149
+        verified_at:
+          type: string
+          format: date-time
+          description: When the verification was performed
+          examples:
+            - "2026-02-25T21:04:35Z"
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+        - checks
+      properties:
+        status:
+          type: string
+          enum: [ healthy, unhealthy ]
+          description: Overall health status
+          examples:
+            - "healthy"
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp of the health check
+          examples:
+            - "2026-01-15T14:30:00Z"
+        checks:
+          type: object
+          description: Health status of individual dependencies
+          properties:
+            database:
+              type: string
+              enum: [ ok, error ]
+              examples:
+                - "ok"
+            redis:
+              type: string
+              enum: [ ok, error ]
+              examples:
+                - "ok"
+            document_provider:
+              type: string
+              enum: [ ok, error ]
+              examples:
+                - "ok"
+            ledger_api:
+              type: string
+              enum: [ ok, error ]
+              examples:
+                - "ok"
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+              examples:
+                - "INSUFFICIENT_BALANCE"
+            message:
+              type: string
+              description: Human-readable error message
+              examples:
+                - "Insufficient balance to complete purchase"
+            details:
+              type: object
+              description: Additional error details
+              additionalProperties: true
+              examples:
+                - required: 10
+                  available: 5
+            request_id:
+              type: string
+              format: uuid
+              description: Request ID for tracking
+              examples:
+                - "550e8400-e29b-41d4-a716-446655440000"
+
+    WebhookPayload:
+      type: object
+      required:
+        - eventId
+        - eventType
+        - timestamp
+        - data
+      description: |
+        Payload sent to your webhook URL when a document status changes.
+
+        The X-Webhook-Signature header contains an HMAC-SHA256 signature.
+        Verify by computing HMAC-SHA256 of the raw request body using your
+        subscription's `secret`.
+
+        **Note:** Each event is per-document, not per-order. A single order may
+        produce multiple events — one for each document purchased.
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          description: Unique identifier for this event
+          examples:
+            - "88867097-4322-436e-ac1a-435e1bd17a15"
+        eventType:
+          type: string
+          description: The event type
+          enum: [ "document.status_changed" ]
+          examples:
+            - "document.status_changed"
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp of the event
+          examples:
+            - "2026-01-15T14:32:15Z"
+        data:
+          $ref: "#/components/schemas/WebhookEventData"
+
+    WebhookEventData:
+      type: object
+      required:
+        - reference
+        - titleNumber
+        - documentDescription
+        - previousStatus
+        - newStatus
+        - statusDescription
+        - downloadUrl
+      properties:
+        reference:
+          type: string
+          format: uuid
+          description: UserDocument reference (GUID). Use this to download the document.
+          examples:
+            - "11edd5d5-3615-4c59-9539-01bd7bb2cfe0"
+        titleNumber:
+          type: string
+          description: UK Land Registry title number
+          examples:
+            - "AB123456"
+        documentDescription:
+          type: string
+          description: Human-readable description of the document type
+          examples:
+            - "Official Copy of Title Register"
+        previousStatus:
+          type: integer
+          description: Numeric status code before the change
+          examples:
+            - 1
+        newStatus:
+          type: integer
+          description: Numeric status code after the change
+          examples:
+            - 2
+        statusDescription:
+          type: string
+          description: Human-readable status label
+          examples:
+            - "Completed"
+        message:
+          type: string
+          nullable: true
+          description: Optional message from the API (e.g. error reason)
+          examples:
+            - null
+        downloadUrl:
+          type: string
+          description: Relative path to download the document
+          examples:
+            - "/Lookup/DownloadDocument?userDocumentReference=11edd5d5-3615-4c5\
+              9-9539-01bd7bb2cfe0"
+
+    WebhookAuditItem:
+      type: object
+      required:
+        - id
+        - event_id
+        - subscription_id
+        - document_status
+        - attempt_number
+        - is_success
+        - attempted_at
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Audit record identifier
+        event_id:
+          type: string
+          format: uuid
+          description: Webhook event identifier
+        subscription_id:
+          type: string
+          format: uuid
+          description: Subscription that triggered this delivery
+        endpoint_url:
+          type: string
+          nullable: true
+          description: URL the delivery was attempted to
+        event_type:
+          type: string
+          nullable: true
+          description: Type of webhook event
+          examples:
+            - "document.status_changed"
+        document_reference:
+          type: string
+          nullable: true
+          description: Document reference associated with this event
+        title_number:
+          type: string
+          nullable: true
+          description: Title number associated with this event
+        document_status:
+          type: integer
+          description: Numeric document status code
+        document_status_description:
+          type: string
+          nullable: true
+          description: Human-readable document status
+        attempt_number:
+          type: integer
+          description: Which attempt this was (1-indexed)
+        http_status_code:
+          type: integer
+          nullable: true
+          description: HTTP status code returned by the customer endpoint
+        is_success:
+          type: boolean
+          description: Whether this delivery attempt succeeded
+        error_message:
+          type: string
+          nullable: true
+          description: Error message if delivery failed
+        attempted_at:
+          type: string
+          format: date-time
+          description: When this delivery attempt was made
+        duration_ms:
+          type: integer
+          nullable: true
+          description: How long the delivery attempt took in milliseconds
+
+    WebhookAuditRequest:
+      type: object
+      properties:
+        start_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: Start of date range filter (ISO 8601)
+          examples:
+            - "2026-04-14T00:00:00Z"
+        end_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: End of date range filter (ISO 8601)
+          examples:
+            - "2026-04-21T23:59:59Z"
+        subscription_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Filter to a specific subscription
+        document_reference:
+          type: string
+          nullable: true
+          description: Filter to a specific document reference
+        page_number:
+          type: integer
+          minimum: 1
+          default: 1
+          description: Page number (1-indexed)
+        page_size:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+          description: Number of items per page
+
+    WebhookAuditResponse:
+      type: object
+      required:
+        - items
+        - total_count
+        - page_number
+        - page_size
+        - total_pages
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookAuditItem"
+          description: Audit records for this page
+        total_count:
+          type: integer
+          description: Total number of matching records
+        page_number:
+          type: integer
+          description: Current page number
+        page_size:
+          type: integer
+          description: Number of items per page
+        total_pages:
+          type: integer
+          description: Total number of pages
+
+    WebhookEventDetailsResponse:
+      type: object
+      required:
+        - event_id
+        - attempts
+      properties:
+        event_id:
+          type: string
+          format: uuid
+          description: The webhook event identifier
+        attempts:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookAuditItem"
+          description: All delivery attempts for this event
+
+    WebhookStatisticsRequest:
+      type: object
+      required:
+        - start_date
+        - end_date
+      properties:
+        start_date:
+          type: string
+          format: date-time
+          description: Start of the statistics window (ISO 8601)
+          examples:
+            - "2026-03-22T00:00:00Z"
+        end_date:
+          type: string
+          format: date-time
+          description: End of the statistics window (ISO 8601)
+          examples:
+            - "2026-04-21T23:59:59Z"
+
+    WebhookStatisticsResponse:
+      type: object
+      required:
+        - total_attempts
+        - successful_deliveries
+        - failed_deliveries
+        - success_rate
+        - average_duration_ms
+      properties:
+        total_attempts:
+          type: integer
+          description: Total number of webhook delivery attempts in the period
+        successful_deliveries:
+          type: integer
+          description: Number of successful deliveries
+        failed_deliveries:
+          type: integer
+          description: Number of failed deliveries
+        success_rate:
+          type: number
+          format: double
+          description: Success rate as a decimal (0.0–1.0)
+          examples:
+            - 0.97
+        average_duration_ms:
+          type: number
+          format: double
+          description: Average delivery duration in milliseconds
+          examples:
+            - 145.3
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "INVALID_REQUEST"
+              message: "Invalid title number format"
+              details:
+                field: "title_number"
+                value: "INVALID"
+                pattern: "^[A-Z]{1,3}[0-9]{1,7}$"
+
+    Unauthorized:
+      description: Authentication failed - invalid, expired, or missing access token
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            missingToken:
+              summary: Missing access token
+              value:
+                error:
+                  code: "UNAUTHORIZED"
+                  message: "Missing or invalid Authorization header. Include 'Authorization:
+                    Bearer <access_token>' in your request."
+            expiredToken:
+              summary: Expired access token
+              value:
+                error:
+                  code: "TOKEN_EXPIRED"
+                  message: "Access token has expired. Please refresh your token or
+                    re-authenticate."
+            invalidToken:
+              summary: Invalid access token
+              value:
+                error:
+                  code: "INVALID_TOKEN"
+                  message: "Access token is invalid or malformed."
+            insufficientScopes:
+              summary: Insufficient permissions
+              value:
+                error:
+                  code: "FORBIDDEN"
+                  message: "Access token does not have the required scopes for this operation."
+                  details:
+                    required_scopes: [ "docs.purchase" ]
+                    granted_scopes: [ "docs.read" ]
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error: "Not found"
+            message: "Title number not found"
+
+    PaymentRequired:
+      description: Insufficient token balance
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "INSUFFICIENT_BALANCE"
+              message: "Insufficient balance to complete purchase"
+              details:
+                required: 10
+                available: 5
+
+    TooManyRequests:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          description: The rate limit ceiling for this endpoint
+          schema:
+            type: integer
+            examples:
+              - 60
+        X-RateLimit-Remaining:
+          description: The number of requests left for the time window
+          schema:
+            type: integer
+            examples:
+              - 0
+        X-RateLimit-Reset:
+          description: The time at which the rate limit window resets (Unix timestamp)
+          schema:
+            type: integer
+            examples:
+              - 1705330200
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "RATE_LIMIT_EXCEEDED"
+              message: "Rate limit exceeded. Please try again later."
+              details:
+                limit: 60
+                window: "per minute"
+                reset_at: "2026-01-15T14:30:00Z"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "INTERNAL_ERROR"
+              message: "An unexpected error occurred"
+              request_id: "550e8400-e29b-41d4-a716-446655440000"
+
+    BadGateway:
+      description: External service error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          example:
+            error:
+              code: "EXTERNAL_SERVICE_ERROR"
+              message: "HMLR service is currently unavailable"
+              details:
+                service: "HMLR Document Availability API"
+                retry_after: 300
