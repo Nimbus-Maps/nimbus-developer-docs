@@ -1,8 +1,10 @@
 ---
-sidebar_position: 1
+sidebar_position: 2
+title: Getting Started
+slug: /property-search/getting-started
 ---
 
-# Getting Started
+# Property Search Getting Started
 
 The Nimbus Property Search API provides access to comprehensive UK property data — including land registry titles, planning applications, environmental constraints, sales history, EPC ratings, comparable deals, and more.
 
@@ -122,7 +124,7 @@ curl "https://api.nimbusmaps.co.uk/search/v1/titles/76a19144-1878-4973-817c-3703
 
 ## Next Steps
 
-- **[Quick Reference](quickstart)** — concise endpoint and query reference
-- **[API Examples](api-examples)** — copy-pasteable request and response examples
-- **[Field Reference](elasticsearch-schema)** — complete property data field descriptions
-- **[API Reference](/api/)** — interactive documentation for every endpoint
+- **[Quick Reference](quick-reference)** — concise endpoint and query reference
+- **[API Examples](examples)** — copy-pasteable request and response examples
+- **[Field Reference](fields/titles)** — complete property data field descriptions
+- **[API Reference](/api/property-search/)** — interactive documentation for every endpoint

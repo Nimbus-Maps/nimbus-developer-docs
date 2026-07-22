@@ -1,8 +1,10 @@
 ---
-sidebar_position: 2
+sidebar_position: 3
+title: Quick Reference
+slug: /property-search/quick-reference
 ---
 
-# Quick Reference
+# Property Search Quick Reference
 
 ## Essential Information
 
@@ -115,9 +117,9 @@ curl -X POST "https://api.nimbusmaps.co.uk/search/v1/titles" \
 ## Key Documentation
 
 - **[Getting Started](getting-started)** — authentication and your first request
-- **[Field Reference](elasticsearch-schema)** — complete field reference
-- **[API Examples](api-examples)** — working request/response examples
-- **[API Reference](/api/)** — full interactive API reference
+- **[Field Reference](fields/titles)** — complete field reference
+- **[API Examples](examples)** — working request/response examples
+- **[API Reference](/api/property-search/)** — full interactive API reference
 
 ## Common Queries
 

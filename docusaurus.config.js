@@ -5,7 +5,7 @@ const {themes: prismThemes} = require('prism-react-renderer');
 /** @type {import('@docusaurus/types').Config} */
 const config = {
   title: 'Nimbus Developer Docs',
-  tagline: 'Comprehensive UK property data API',
+  tagline: 'Developer documentation for Nimbus APIs and integrations',
   url: 'https://docs.nimbusmaps.co.uk',
   baseUrl: '/',
   onBrokenLinks: 'throw',
@@ -32,9 +32,14 @@ const config = {
       ({
         specs: [
           {
-            id: 'nimbus-search-api',
-            spec: './openapi.yaml',
-            route: '/api/',
+            id: 'property-search-api',
+            spec: './openapi/property-search.yaml',
+            route: '/api/property-search/',
+          },
+          {
+            id: 'document-purchase-api',
+            spec: './openapi/document-purchasing.yaml',
+            route: '/api/document-purchase/',
           },
         ],
         theme: {
@@ -74,18 +79,28 @@ const config = {
         },
         items: [
           {
-            to: '/guides/getting-started',
-            label: 'Guides',
+            to: '/guides/',
+            label: 'Docs',
             position: 'left',
           },
           {
-            to: '/api/',
+            type: 'dropdown',
             label: 'API Reference',
             position: 'left',
+            items: [
+              {
+                to: '/api/property-search/',
+                label: 'Property Search API',
+              },
+              {
+                to: '/api/document-purchase/',
+                label: 'Document Purchasing API',
+              },
+            ],
           },
           {
-            to: '/guides/faq',
-            label: 'FAQ',
+            to: '/guides/mcp/nimbus-mcp-server',
+            label: 'MCP',
             position: 'left',
           },
         ],
@@ -96,17 +111,18 @@ const config = {
           {
             title: 'Guides',
             items: [
-              {label: 'Getting Started', to: '/guides/getting-started'},
-              {label: 'Quick Reference', to: '/guides/quickstart'},
-              {label: 'API Examples', to: '/guides/api-examples'},
-              {label: 'Field Reference', to: '/guides/elasticsearch-schema'},
-              {label: 'FAQ', to: '/guides/faq'},
+              {label: 'Overview', to: '/guides/'},
+              {label: 'Property Search', to: '/guides/property-search/overview'},
+              {label: 'Document Purchasing', to: '/guides/document-purchase/overview'},
+              {label: 'Shared Authentication', to: '/guides/shared/authentication'},
             ],
           },
           {
-            title: 'API',
+            title: 'API Reference',
             items: [
-              {label: 'API Reference', to: '/api/'},
+              {label: 'All API References', to: '/api/'},
+              {label: 'Property Search API', to: '/api/property-search/'},
+              {label: 'Document Purchasing API', to: '/api/document-purchase/'},
             ],
           },
           {

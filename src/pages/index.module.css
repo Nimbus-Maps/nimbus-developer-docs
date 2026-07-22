@@ -48,3 +48,10 @@
 .featureCard h3 {
   margin-top: 0;
 }
+
+.cardActions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}

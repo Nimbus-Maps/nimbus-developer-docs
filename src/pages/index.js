@@ -8,21 +8,20 @@ function HomepageHero() {
   return (
     <header className={styles.heroBanner}>
       <div className="container">
-        <h1>Nimbus Property Search API</h1>
+        <h1>Nimbus Developer Docs</h1>
         <p>
-          Access comprehensive UK property data — titles, planning applications,
-          constraints, sales history, comparable deals, and more across England,
-          Wales, and Scotland.
+          Build with Nimbus APIs for UK property intelligence, document
+          purchasing and agent integrations.
         </p>
         <div className={styles.buttons}>
-          <Link className="button button--secondary button--lg" to="/guides/getting-started">
-            Get Started
+          <Link className="button button--secondary button--lg" to="/guides/property-search/overview">
+            Golden record
           </Link>
-          <Link className="button button--secondary button--lg" to="/api/">
-            API Reference
+          <Link className="button button--secondary button--lg" to="/guides/document-purchase/overview">
+            Document purchasing
           </Link>
-          <Link className="button button--secondary button--lg" to="/guides/faq">
-            FAQ
+          <Link className="button button--secondary button--lg" to="/api">
+            API reference
           </Link>
         </div>
       </div>
@@ -32,24 +31,32 @@ function HomepageHero() {
 
 const features = [
   {
-    title: 'Property Search',
+    title: 'Property Search API',
     description:
       'Search UK property titles using structured queries or natural language. Filter by location, tenure, area, owner type, and more.',
+    guide: '/guides/property-search/overview',
+    reference: '/api/property-search/',
   },
   {
-    title: 'Comparable Deals',
+    title: 'Document Purchasing API',
     description:
-      'Access commercial and residential comparable deal data including sales, lettings, investment yields, and brochures.',
+      'Check availability, purchase HMLR documents, receive webhook delivery events, and download completed files.',
+    guide: '/guides/document-purchase/overview',
+    reference: '/api/document-purchase/',
   },
   {
-    title: 'Rich Property Data',
+    title: 'Shared Concepts',
     description:
-      'Retrieve planning applications, environmental constraints, EPC ratings, building heights, lease terms, and sales history per title.',
+      'Use common guidance for authentication, errors, rate limits, and production integration behaviour across Nimbus APIs.',
+    guide: '/guides/shared/authentication',
+    reference: '/guides/shared/errors',
   },
   {
-    title: 'Secure & Scalable',
+    title: 'Nimbus MCP Server',
     description:
-      'OAuth 2.0 and subscription key authentication, with rate limiting and query guardrails to ensure consistent performance.',
+      'Connect Claude, ChatGPT or other AI assistants to Nimbus propery data.',
+    guide: '/guides/mcp/nimbus-mcp-server',
+    reference: '/guides/mcp/nimbus-mcp-server',
   },
 ];
 
@@ -57,12 +64,20 @@ function FeaturesSection() {
   return (
     <section className={styles.featuresSection}>
       <div className="container">
-        <h2 style={{textAlign: 'center'}}>What you can build</h2>
+        <h2 style={{textAlign: 'center'}}>Choose an integration</h2>
         <div className={styles.featureGrid}>
-          {features.map(({title, description}) => (
+          {features.map(({title, description, guide, reference}) => (
             <div key={title} className={styles.featureCard}>
               <h3>{title}</h3>
               <p>{description}</p>
+              <div className={styles.cardActions}>
+                <Link className="button button--primary button--sm" to={guide}>
+                  Guide
+                </Link>
+                <Link className="button button--secondary button--sm" to={reference}>
+                  Reference
+                </Link>
+              </div>
             </div>
           ))}
         </div>
@@ -76,7 +91,7 @@ export default function Home() {
   return (
     <Layout
       title={siteConfig.title}
-      description="Nimbus Property Search API developer documentation"
+      description="Nimbus API and integration developer documentation"
     >
       <HomepageHero />
       <main>

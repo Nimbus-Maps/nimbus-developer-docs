@@ -1,5 +1,7 @@
 ---
 sidebar_position: 5
+title: Comparable Deals Field Reference
+slug: /property-search/fields/comparable-deals
 ---
 
 # Comparable Deals Field Reference
