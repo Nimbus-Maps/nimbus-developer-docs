@@ -146,7 +146,6 @@ paths:
                       register:
                         type: "Register"
                         type_code: "REGISTER"
-                        purchase_identifier: "register"
                         availability: "available for immediate download"
                         availability_code: "IMMEDIATE"
                         backdated: false
@@ -155,7 +154,6 @@ paths:
                       title_plan:
                         type: "Plan"
                         type_code: "TITLEPLAN"
-                        purchase_identifier: "title_plan"
                         availability: "available for immediate download"
                         availability_code: "IMMEDIATE"
                         backdated: false
@@ -230,7 +228,6 @@ paths:
                       register:
                         type: "Register"
                         type_code: "REGISTER"
-                        purchase_identifier: "register"
                         availability: "available for immediate download"
                         availability_code: "IMMEDIATE"
                         backdated: true
@@ -239,7 +236,6 @@ paths:
                       title_plan:
                         type: "Plan"
                         type_code: "TITLEPLAN"
-                        purchase_identifier: "title_plan"
                         availability: "available for immediate download"
                         availability_code: "IMMEDIATE"
                         backdated: true
@@ -248,7 +244,7 @@ paths:
                     total_token_cost_estimate: 14
                     current_balance: 150
                 withReferredDocuments:
-                  summary: Title with referred documents (e.g., deeds, charges)
+                  summary: Title with referred documents (e.g., deeds, leases)
                   value:
                     data:
                       title_status: "Title number is valid."
@@ -256,32 +252,29 @@ paths:
                       title_number: "EF345678"
                       pending_applications: []
                       referred_to_documents:
-                        - type: "Charge"
-                          type_code: "CHARGE"
-                          purchase_identifier: "charge"
-                          entry_numbers: [ "C1" ]
-                          date: "2020-12-01"
+                        - type: "Deed"
+                          type_code: "Deed"
+                          entry_numbers: [ "C6" ]
+                          date: "2020-06-20"
                           filed_under: "EF345678"
                           availability: "available for immediate download"
                           availability_code: "IMMEDIATE"
                           plan_only: false
                           token_cost: 7
                           previously_purchased: "2025-11-20T14:22:00Z"
-                        - type: "Abstract"
-                          type_code: "ABSTRACT"
-                          purchase_identifier: null
-                          entry_numbers: [ "A1" ]
+                        - type: "Lease"
+                          type_code: "Lease"
+                          entry_numbers: [ "L1" ]
                           date: "2019-03-15"
-                          filed_under: null
-                          availability: "requires further investigation"
-                          availability_code: "MANUAL"
-                          plan_only: true
+                          filed_under: "EF123456"
+                          availability: "available for immediate download"
+                          availability_code: "IMMEDIATE"
+                          plan_only: false
                           token_cost: 7
                           previously_purchased: null
                       register:
                         type: "Register"
                         type_code: "REGISTER"
-                        purchase_identifier: "register"
                         availability: "available for immediate download"
                         availability_code: "IMMEDIATE"
                         backdated: false
@@ -290,7 +283,6 @@ paths:
                       title_plan:
                         type: "Plan"
                         type_code: "TITLEPLAN"
-                        purchase_identifier: "title_plan"
                         availability: "available for immediate download"
                         availability_code: "IMMEDIATE"
                         backdated: false
@@ -582,6 +574,18 @@ paths:
         - Returns immediately with an order ID
 
         Documents are delivered asynchronously to your subscribed webhook URL when ready.
+
+        ## Document types
+
+        Use `documents` for standard HMLR documents (`register`, `title_plan`).
+
+        Use `referred_documents` for referred documents (deeds, leases, transfers, etc.).
+        Each referred document is identified by the three values returned in the
+        `check-availability` response: `type_code`, `date`, and `filed_under`.
+        This allows you to select specific documents precisely — for example, the first
+        and third lease on a title — rather than ordering all documents of a given type.
+
+        At least one of `documents` or `referred_documents` must be provided.
       operationId: purchaseDocuments
       security:
         - OAuth2: [ docs.purchase ]
@@ -594,13 +598,39 @@ paths:
               $ref: "#/components/schemas/PurchaseRequest"
             examples:
               standardPurchase:
-                summary: Purchase register and title plan
+                summary: Purchase register and title plan only
                 value:
                   title_number: "AB123456"
                   documents:
                     - "register"
                     - "title_plan"
                   customer_reference: "CUST-ORDER-12345"
+              referredDocuments:
+                summary: Purchase specific referred documents
+                value:
+                  title_number: "BK383592"
+                  referred_documents:
+                    - type_code: "Deed"
+                      date: "2021-10-11"
+                      filed_under: "BK383592"
+                    - type_code: "Lease"
+                      date: "2021-05-18"
+                      filed_under: "BK518479"
+                  customer_reference: "CUST-ORDER-12346"
+              mixed:
+                summary: Purchase register plus specific referred documents
+                value:
+                  title_number: "BK383592"
+                  documents:
+                    - "register"
+                  referred_documents:
+                    - type_code: "Deed"
+                      date: "2023-07-14"
+                      filed_under: "BK527080"
+                    - type_code: "Transfer"
+                      date: "2017-08-23"
+                      filed_under: "BK451545"
+                  customer_reference: "CUST-ORDER-12347"
       responses:
         "201":
           description: Order created successfully and processing started
@@ -614,12 +644,18 @@ paths:
                   value:
                     order_id: "770e8400-e29b-41d4-a716-446655440002"
                     status: "PROCESSING"
-                    title_number: "AB123456"
+                    title_number: "BK383592"
                     documents_ordered:
                       - "register"
-                      - "title_plan"
-                    total_tokens_charged: 14
-                    new_balance: 136
+                    referred_documents_ordered:
+                      - type_code: "Deed"
+                        date: "2021-10-11"
+                        filed_under: "BK383592"
+                      - type_code: "Lease"
+                        date: "2021-05-18"
+                        filed_under: "BK518479"
+                    total_tokens_charged: 21
+                    new_balance: 129
                     estimated_delivery: "2026-01-15T14:35:00Z"
         "400":
           $ref: "#/components/responses/BadRequest"
@@ -1138,32 +1174,45 @@ components:
             /.default: Requests all app roles granted to your Entra app registration
 
   schemas:
-    DocumentTypeIdentifier:
-      type: string
-      description: Document type identifier used in `/purchase` requests and returned as `purchase_identifier` in `/check-availability` responses.
-      enum:
-        - register
-        - title_plan
-        - lease_document
-        - conveyance
-        - deed
-        - transfer
-        - charge
-        - nimbus_maps
-        - property_report
-        - availability_report
-        - location_report
-        - relevant_activity_report
-        - high_impact_planning_applications_report
-        - commercial_comps_leasehold
-        - commercial_comps_freehold
-        - investment_comps
-        - residential_comps
-        - other_holdings
-        - flood_risk
-        - kml
-        - site_report_basic
-        - site_report_advanced
+    ReferredDocumentPurchaseItem:
+      type: object
+      required:
+        - type_code
+        - date
+        - filed_under
+      description: |
+        Identifies a specific referred document to purchase.
+        Copy these three values directly from the `referred_to_documents` array in the
+        `check-availability` response to select the exact document you want.
+      properties:
+        type_code:
+          type: string
+          description: |
+            Document type code copied exactly from the `type_code` field in the
+            `referred_to_documents` array of the check-availability response.
+            Matching is case-insensitive.
+
+            Currently supported values: `Deed`, `Lease`, `Lease of`, `Transfer`, `Conveyance`.
+
+            Other type codes returned by HMLR (e.g. `Agreement`) are not yet supported
+            and will return `400 UNSUPPORTED_DOCUMENT_TYPE` if used in a purchase request.
+          examples:
+            - "Deed"
+            - "Lease"
+            - "Lease of"
+            - "Transfer"
+            - "Conveyance"
+        date:
+          type: string
+          format: date
+          description: Exact filing date of the document (YYYY-MM-DD) from the check-availability response
+          examples:
+            - "2021-10-11"
+        filed_under:
+          type: string
+          description: Title number under which the document is filed, from the check-availability response
+          examples:
+            - "BK383592"
 
     AvailabilityCheckRequest:
       type: object
@@ -1253,7 +1302,10 @@ components:
             $ref: "#/components/schemas/PendingApplication"
         referred_to_documents:
           type: array
-          description: List of referred documents (deeds, charges, leases, etc.)
+          description: |
+            List of referred documents (deeds, leases, transfers, conveyances, etc.) as returned
+            by HMLR. The `type_code`, `date`, and `filed_under` values from each item can be
+            passed directly into `ReferredDocumentPurchaseItem` to purchase that document.
           items:
             $ref: "#/components/schemas/ReferredDocument"
         register:
@@ -1266,12 +1318,12 @@ components:
       required:
         - type
         - type_code
-        - purchase_identifier
         - availability
         - availability_code
         - backdated
         - token_cost
         - previously_purchased
+        - document_id
       properties:
         type:
           type: string
@@ -1282,13 +1334,10 @@ components:
             - "Plan"
         type_code:
           type: string
-          description: HMLR's internal document type code. This is not the value to use in `/purchase` — use `purchase_identifier` instead.
+          description: Document type code
           examples:
             - "REGISTER"
             - "TITLEPLAN"
-        purchase_identifier:
-          $ref: "#/components/schemas/DocumentTypeIdentifier"
-          description: The identifier to pass in the `documents` array when calling `/purchase` for this document.
         availability:
           type: string
           description: Availability status message from HMLR
@@ -1324,40 +1373,54 @@ components:
             This is informational only - you can still purchase the document again as it may be out of date.
           examples:
             - null
+        document_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: |-
+            UUID of the previously purchased document, or null if never purchased.
+            Pass this to GET /download/{document_id} to re-download without paying again.
+          examples:
+            - null
+            - "990e8400-e29b-41d4-a716-446655440003"
 
     ReferredDocument:
       type: object
       required:
         - type
         - type_code
-        - purchase_identifier
         - entry_numbers
         - availability
         - availability_code
         - plan_only
         - token_cost
         - previously_purchased
+        - document_id
       properties:
         type:
           type: string
-          description: Human-readable document type (e.g., "Charge", "Deed", "Lease")
+          description: |
+            Human-readable document type as returned by HMLR (e.g. "Deed", "Lease", "Transfer",
+            "Conveyance"). Display only — use `type_code` when constructing a purchase request.
           examples:
-            - "Charge"
+            - "Deed"
+            - "Lease"
+            - "Lease of"
+            - "Transfer"
+            - "Conveyance"
         type_code:
           type: string
-          description: HMLR's internal document type code. This is not the value to use in `/purchase` — use `purchase_identifier` instead.
+          description: |
+            Document type code as returned by HMLR. Pass this value directly into the
+            `type_code` field of `ReferredDocumentPurchaseItem` when constructing a purchase
+            request. Values are title-cased (e.g. `Deed`, `Lease`, `Transfer`, `Conveyance`)
+            — not the uppercase codes shown in older documentation.
           examples:
-            - "CHARGE"
-        purchase_identifier:
-          oneOf:
-            - $ref: "#/components/schemas/DocumentTypeIdentifier"
-            - type: "null"
-          description: |-
-            The identifier to pass in the `documents` array when calling `/purchase` for this document.
-            Null if the document cannot be purchased via the API (e.g., availability_code is MANUAL or UNAVAILABLE).
-          examples:
-            - "charge"
-            - null
+            - "Deed"
+            - "Lease"
+            - "Lease of"
+            - "Transfer"
+            - "Conveyance"
         entry_numbers:
           type: array
           description: Register entry numbers where this document is referred to
@@ -1414,6 +1477,16 @@ components:
             This is informational only - you can still purchase the document again as it may be out of date.
           examples:
             - "2025-11-20T14:22:00Z"
+        document_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: |-
+            UUID of the previously purchased document, or null if never purchased.
+            Pass this to GET /download/{document_id} to re-download without paying again.
+          examples:
+            - null
+            - "990e8400-e29b-41d4-a716-446655440003"
 
     PendingApplication:
       type: object
@@ -1497,7 +1570,6 @@ components:
       type: object
       required:
         - title_number
-        - documents
       properties:
         title_number:
           type: string
@@ -1507,15 +1579,29 @@ components:
             - "AB123456"
         documents:
           type: array
-          description: |-
-            List of document identifiers to purchase. Use the `purchase_identifier` field from each
-            document in the `/check-availability` response. Note: `purchase_identifier` is not the
-            same as `type_code` — do not use the HMLR type code (e.g. "REGISTER") here.
+          description: |
+            Standard HMLR documents to purchase. Only `register` and `title_plan` are accepted.
+            Optional if `referred_documents` is provided.
           items:
-            $ref: "#/components/schemas/DocumentTypeIdentifier"
-          minItems: 1
+            type: string
+            enum: [ register, title_plan ]
+          maxItems: 2
           examples:
             - [ "register", "title_plan" ]
+        referred_documents:
+          type: array
+          description: |
+            Referred documents (deeds, leases, transfers, etc.) to purchase.
+            Each item uses the exact `type_code`, `date`, and `filed_under` values from the
+            `check-availability` response to uniquely identify the document.
+            Optional if `documents` is provided.
+          items:
+            $ref: "#/components/schemas/ReferredDocumentPurchaseItem"
+          maxItems: 50
+          examples:
+            - - type_code: "Deed"
+                date: "2021-10-11"
+                filed_under: "BK383592"
         customer_reference:
           type: string
           description: Your internal reference for this order
@@ -1530,6 +1616,7 @@ components:
         - status
         - title_number
         - documents_ordered
+        - referred_documents_ordered
         - total_tokens_charged
         - new_balance
       properties:
@@ -1552,15 +1639,21 @@ components:
             - "AB123456"
         documents_ordered:
           type: array
-          description: List of document IDs that will be ordered and delivered
+          description: Standard document IDs ordered (register, title_plan)
           items:
             type: string
           examples:
             - [ "register", "title_plan" ]
+        referred_documents_ordered:
+          type: array
+          description: Referred documents ordered
+          items:
+            $ref: "#/components/schemas/ReferredDocumentPurchaseItem"
+          examples:
+            - []
         total_tokens_charged:
           type: integer
-          description: Total tokens deducted from account (only for documents_ordered, not
-            excluded ones)
+          description: Total tokens deducted from account
           examples:
             - 14
           minimum: 0
