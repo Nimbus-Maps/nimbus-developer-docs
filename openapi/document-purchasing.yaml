@@ -1287,7 +1287,17 @@ components:
             - PENDING_DEALING
             - PENDING_FIRST
             - SCHEME
-          description: Status code from HMLR
+          description: |
+            Status code from HMLR describing the overall state of this title:
+            - VALID: Title is registered and active. You may purchase any document with availability_code IMMEDIATE.
+            - PENDING_APPLICATIONS: One or more applications are pending. IMMEDIATE documents may be backdated (check the `backdated` field on each document).
+            - CLOSED: Title has been closed (e.g. merged into another title).
+            - INVALID: Title number is not recognised by HMLR.
+            - CLOSED_AND_CONTINUED: Title closed and continued on a new title number.
+            - NOT_COMPUTERISED: Title is not held electronically; documents are not available.
+            - PENDING_DEALING: A dealing is pending against this title.
+            - PENDING_FIRST: First registration is pending.
+            - SCHEME: Scheme title.
           examples:
             - "VALID"
         title_number:
@@ -1347,10 +1357,15 @@ components:
           type: string
           enum: [ IMMEDIATE, MANUAL, UNAVAILABLE ]
           description: |
-            Availability status code:
-            - IMMEDIATE: Available for immediate download
-            - MANUAL: Requires manual processing/further investigation
-            - UNAVAILABLE: Not available
+            Availability status code indicating whether the document can be purchased:
+            - IMMEDIATE: Document is available for immediate download from HMLR. `token_cost` is 7.
+              **Include this document in a `/purchase` request.**
+            - MANUAL: HMLR requires manual investigation before the document can be fulfilled.
+              `token_cost` is 0. **Do not include in a `/purchase` request.**
+            - UNAVAILABLE: Document does not exist or cannot be obtained from HMLR.
+              `token_cost` is 0. **Do not include in a `/purchase` request.**
+
+            Only documents with `availability_code: IMMEDIATE` are counted in `total_token_cost_estimate`.
           examples:
             - "IMMEDIATE"
         backdated:
@@ -1451,10 +1466,15 @@ components:
           type: string
           enum: [ IMMEDIATE, MANUAL, UNAVAILABLE ]
           description: |
-            Availability status code:
-            - IMMEDIATE: Available for immediate download
-            - MANUAL: Requires manual processing/further investigation
-            - UNAVAILABLE: Not available
+            Availability status code indicating whether the document can be purchased:
+            - IMMEDIATE: Document is available for immediate download from HMLR. `token_cost` is 7.
+              **Include this document in a `/purchase` request.**
+            - MANUAL: HMLR requires manual investigation before the document can be fulfilled.
+              `token_cost` is 0. **Do not include in a `/purchase` request.**
+            - UNAVAILABLE: Document does not exist or cannot be obtained from HMLR.
+              `token_cost` is 0. **Do not include in a `/purchase` request.**
+
+            Only documents with `availability_code: IMMEDIATE` are counted in `total_token_cost_estimate`.
           examples:
             - "IMMEDIATE"
         plan_only:
