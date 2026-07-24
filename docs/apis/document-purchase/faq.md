@@ -19,6 +19,18 @@ Use delegated authentication when purchases must be tied to a human user. Use ap
 
 Delegated webhook subscriptions are per user. Application flow subscriptions are tied to the service identity for the integration.
 
+## When should I call the purchase endpoint for a document?
+
+Only call `/purchase` for a document when its `availability_code` is `IMMEDIATE`. This means HMLR can fulfil the request immediately and the document will be delivered to your webhook.
+
+| `availability_code` | Call `/purchase`? | `token_cost` |
+|---|---|---|
+| `IMMEDIATE` | **Yes** | 7 tokens |
+| `MANUAL` | **No** — HMLR requires manual investigation; the document cannot be purchased through this API at this time | 0 |
+| `UNAVAILABLE` | **No** — document oes not exist or is not obtainable from HMLR | 0 |
+
+The `total_token_cost_estimate` in the response already reflects only `IMMEDIATE` documents, so it can be used directly to check whether you have sufficient balance before calling `/purchase`. Including a non-`IMMEDIATE` document in a purchase request may result in tokens being charged without the document being delivered.
+
 ## When are tokens charged?
 
 Tokens are deducted when a purchase request succeeds. If a purchase fails because of insufficient balance or validation errors, no tokens are charged.

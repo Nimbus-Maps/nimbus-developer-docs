@@ -369,10 +369,42 @@ Authorization: Bearer eyJ0eXAiOiJKV1QiLCJhbGc...
 ```
 
 **Response Fields:**
-- `token_cost` - Cost in tokens for this document
+- `token_cost` - Cost in tokens for this document (0 if not `IMMEDIATE`)
 - `current_balance` - User's current token balance
-- `availability_code` - `IMMEDIATE`, `BACKDATED`, or `NOT_AVAILABLE`
-- `previously_purchased` - If document was already purchased (nullable)
+- `total_token_cost_estimate` - Total cost if all available documents are purchased
+- `previously_purchased` - ISO 8601 timestamp if the document was previously purchased by this user, otherwise `null`
+- `document_id` - UUID of the previously purchased document. Pass this to `GET /download/{document_id}` to re-download without paying again
+- `backdated` - `true` when the document reflects the state before pending applications were lodged
+
+#### Document Availability Codes
+
+Each document in the response has an `availability_code` field indicating whether you should call the purchase endpoint:
+
+| `availability_code` | Meaning | Call `/purchase`? |
+|---|---|---|
+| `IMMEDIATE` | Available for immediate download from HMLR | **Yes** — document will be delivered to your webhook quickly |
+| `MANUAL` | HMLR requires manual investigation before the document can be fulfilled | **No** — the document cannot be purchased through this API at this time |
+| `UNAVAILABLE` | Document does not exist or is not available at HMLR | **No** — the document cannot be obtained |
+
+**Decision rule: only include a document in a purchase request if its `availability_code` is `IMMEDIATE`.**
+
+Documents with `availability_code` of `MANUAL` or `UNAVAILABLE` have a `token_cost` of `0` and are excluded from `total_token_cost_estimate`. Including a non-`IMMEDIATE` document in a purchase request may result in tokens being charged without the document being delivered.
+
+#### Title Status Codes
+
+The `title_status_code` field describes the overall state of the title at HMLR:
+
+| `title_status_code` | Meaning |
+|---|---|
+| `VALID` | Title is registered and active. You may purchase available documents. |
+| `PENDING_APPLICATIONS` | One or more applications are pending against this title. Documents may be backdated (check the `backdated` field). You may still purchase `IMMEDIATE` documents, but they will reflect the pre-application state. |
+| `CLOSED` | Title has been closed (e.g. merged into another title). |
+| `INVALID` | Title number is not recognised by HMLR. |
+| `CLOSED_AND_CONTINUED` | Title closed and continued on a new title number. |
+| `NOT_COMPUTERISED` | Title exists but is not held in electronic form. Documents are not available. |
+| `PENDING_DEALING` | A dealing is pending. |
+| `PENDING_FIRST` | First registration is pending. |
+| `SCHEME` | Scheme title. |
 
 ### Step 4: Purchase Documents
 
