@@ -2211,11 +2211,36 @@ components:
           description: UserDocument reference (GUID). Use this to download the document.
           examples:
             - "11edd5d5-3615-4c59-9539-01bd7bb2cfe0"
+        orderId:
+          type: string
+          format: uuid
+          nullable: true
+          description: |
+            The order ID returned by `POST /purchase`. Use this to correlate the
+            webhook notification with the originating purchase request without
+            needing to poll the order status endpoint.
+          examples:
+            - "3fa85f64-5717-4562-b3fc-2c963f66afa6"
         titleNumber:
           type: string
           description: UK Land Registry title number
           examples:
             - "AB123456"
+        documentTypeId:
+          type: string
+          nullable: true
+          description: |
+            Machine-readable document type identifier. Matches the `document_type_id`
+            values used in `/check-availability` and `GET /orders/{order_id}`.
+          enum:
+            - title_plan
+            - register
+            - lease
+            - deed
+            - transfer
+            - conveyance
+          examples:
+            - "register"
         documentDescription:
           type: string
           description: Human-readable description of the document type
