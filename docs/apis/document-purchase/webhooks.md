@@ -34,6 +34,8 @@ The response includes a `secret`. Store it immediately; it is returned only once
 
 ## Event Payload
 
+**Successful delivery:**
+
 ```json
 {
   "eventId": "88867097-4322-436e-ac1a-435e1bd17a15",
@@ -51,6 +53,32 @@ The response includes a `secret`. Store it immediately; it is returned only once
   }
 }
 ```
+
+**Failed delivery (`newStatus: 3`):**
+
+```json
+{
+  "eventId": "a1b2c3d4-0000-0000-0000-000000000000",
+  "eventType": "document.status_changed",
+  "timestamp": "2026-01-15T14:35:10Z",
+  "data": {
+    "reference": "11edd5d5-3615-4c59-9539-01bd7bb2cfe0",
+    "titleNumber": "AB123456",
+    "documentDescription": null,
+    "previousStatus": 1,
+    "newStatus": 3,
+    "statusDescription": "Error",
+    "message": "Document could not be retrieved from HMLR",
+    "downloadUrl": null
+  }
+}
+```
+
+:::note Nullable fields
+`documentDescription` is `null` for standard HMLR documents (register, title plan, lease, etc.) — it is only populated for certain custom document types.
+
+`downloadUrl` is `null` when `newStatus` is `3` (Error). Always check `newStatus` before attempting to use `downloadUrl`.
+:::
 
 Use `data.reference` as the `{document_id}` when calling `GET /download/{document_id}`.
 
