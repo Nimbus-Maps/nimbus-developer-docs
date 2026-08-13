@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'openapi.yaml'
+      - 'openapi/**'
       - 'docs/**'
       - 'src/**'
       - 'static/**'
