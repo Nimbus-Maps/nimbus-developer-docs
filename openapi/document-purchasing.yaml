@@ -758,19 +758,17 @@ paths:
                   value:
                     order_id: "770e8400-e29b-41d4-a716-446655440002"
                     status: "COMPLETED"
-                    title_number: "AB123456"
                     customer_reference: "CUST-ORDER-12345"
-                    documents_ordered:
-                      - "register"
-                      - "title_plan"
-                    documents_delivered:
-                      - document_type_id: "register"
+                    documents:
+                      - document_type: "register"
                         document_id: "990e8400-e29b-41d4-a716-446655440003"
+                        title_number: "AB123456"
                         status: "DELIVERED"
                         webhook_delivery_status: "SUCCESS"
                         webhook_delivery_attempts: 1
-                      - document_type_id: "title_plan"
+                      - document_type: "title_plan"
                         document_id: "991e8400-e29b-41d4-a716-446655440004"
+                        title_number: "AB123456"
                         status: "DELIVERED"
                         webhook_delivery_status: "SUCCESS"
                         webhook_delivery_attempts: 1
@@ -782,48 +780,42 @@ paths:
                   value:
                     order_id: "770e8400-e29b-41d4-a716-446655440002"
                     status: "PROCESSING"
-                    title_number: "AB123456"
                     customer_reference: "CUST-ORDER-12345"
-                    documents_ordered:
-                      - "register"
-                      - "title_plan"
-                    documents_delivered:
-                      - document_type_id: "register"
+                    documents:
+                      - document_type: "register"
+                        title_number: "AB123456"
                         status: "PENDING"
                         webhook_delivery_status: null
                         webhook_delivery_attempts: 0
-                      - document_type_id: "title_plan"
+                      - document_type: "title_plan"
+                        title_number: "AB123456"
                         status: "PENDING"
                         webhook_delivery_status: null
                         webhook_delivery_attempts: 0
                     total_tokens_charged: 14
                     created_at: "2026-01-15T14:30:00Z"
-                    completed_at: null
                 webhookFailed:
                   summary: Documents ready but webhook failed
                   value:
                     order_id: "770e8400-e29b-41d4-a716-446655440002"
                     status: "WEBHOOK_FAILED"
-                    title_number: "AB123456"
                     customer_reference: "CUST-ORDER-12345"
-                    documents_ordered:
-                      - "register"
-                      - "title_plan"
-                    documents_delivered:
-                      - document_type_id: "register"
+                    documents:
+                      - document_type: "register"
                         document_id: "990e8400-e29b-41d4-a716-446655440003"
+                        title_number: "AB123456"
                         status: "DOWNLOADED"
                         webhook_delivery_status: "FAILED"
                         webhook_delivery_attempts: 4
-                      - document_type_id: "title_plan"
+                      - document_type: "title_plan"
                         document_id: "991e8400-e29b-41d4-a716-446655440004"
+                        title_number: "AB123456"
                         status: "DOWNLOADED"
                         webhook_delivery_status: "FAILED"
                         webhook_delivery_attempts: 4
                     total_tokens_charged: 14
                     error_message: "Webhook delivery failed after 4 attempts: Connection timeout"
                     created_at: "2026-01-15T14:30:00Z"
-                    completed_at: null
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -1752,9 +1744,7 @@ components:
       required:
         - order_id
         - status
-        - title_number
-        - documents_ordered
-        - documents_delivered
+        - documents
         - total_tokens_charged
         - created_at
       properties:
@@ -1770,24 +1760,12 @@ components:
           description: Current order status
           examples:
             - "COMPLETED"
-        title_number:
-          type: string
-          description: The title number for this order
-          examples:
-            - "AB123456"
         customer_reference:
           type: string
           description: Customer's reference for this order
           examples:
             - "CUST-ORDER-12345"
-        documents_ordered:
-          type: array
-          description: List of document IDs in this order
-          items:
-            type: string
-          examples:
-            - [ "register", "title_plan" ]
-        documents_delivered:
+        documents:
           type: array
           description: Delivery status of each document
           items:
@@ -1820,15 +1798,20 @@ components:
     DocumentDeliveryStatus:
       type: object
       required:
-        - document_type_id
+        - document_type
         - status
       properties:
-        document_type_id:
+        document_type:
           type: string
           description: Document type identifier (e.g., "register", "title_plan",
             "ref_doc_001")
           examples:
             - "register"
+        title_number:
+          type: string
+          description: Land Registry title number for this document
+          examples:
+            - "AB123456"
         document_id:
           type: string
           format: uuid
@@ -2219,11 +2202,9 @@ components:
       required:
         - reference
         - titleNumber
-        - documentDescription
         - previousStatus
         - newStatus
         - statusDescription
-        - downloadUrl
       properties:
         reference:
           type: string
@@ -2263,6 +2244,7 @@ components:
             - "register"
         documentDescription:
           type: string
+          nullable: true
           description: Human-readable description of the document type
           examples:
             - "Official Copy of Title Register"
@@ -2289,7 +2271,8 @@ components:
             - null
         downloadUrl:
           type: string
-          description: Relative path to download the document
+          nullable: true
+          description: Relative path to download the document. Null until the document reaches DOWNLOADED status.
           examples:
             - "/Lookup/DownloadDocument?userDocumentReference=11edd5d5-3615-4c5\
               9-9539-01bd7bb2cfe0"
