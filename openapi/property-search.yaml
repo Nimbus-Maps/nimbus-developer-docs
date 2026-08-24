@@ -2416,6 +2416,7 @@ paths:
                     footprintAreaSqFt:
                       type: number
                       format: double
+                      description: Building footprint area in square feet
                     uprns:
                       type: array
                       items:
@@ -4510,7 +4511,7 @@ components:
               footprintAreaSqFt:
                 type: number
                 format: double
-                description: Building footprint area
+                description: Building footprint area in square feet
                 example: 329.50211625656
 
               uprns:
