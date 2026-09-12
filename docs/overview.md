@@ -2,7 +2,7 @@
 sidebar_position: 1
 title: Developer Docs Overview
 slug: /
-description: Start here for Nimbus APIs, shared integration concepts, and future MCP server documentation.
+description: Start here for Nimbus APIs, shared integration concepts, and MCP server documentation.
 ---
 
 # Nimbus Developer Docs
@@ -26,4 +26,4 @@ Use the shared pages for concepts that apply across multiple APIs:
 
 ## AI Agent MCP Integrations
 
-Refer to [Nimbus MCP Server](/guides/mcp/nimbus-mcp-server/) to provide Claude, ChatGPT or other AI assistants with access to Nimbus property data.
+Refer to [Nimbus MCP Server](/guides/mcp/nimbus-mcp-server/) to provide Claude, ChatGPT, Microsoft 365 Copilot, or other AI assistants with access to Nimbus property data.
