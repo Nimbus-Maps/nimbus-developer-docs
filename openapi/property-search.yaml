@@ -921,6 +921,145 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /comps/{dealId}/images:
+    get:
+      operationId: getCompsImages
+      tags:
+        - Comps
+      summary: List archived listing images for a comparable deal
+      description: |
+        Returns metadata about listing images archived to blob storage for a comparable deal,
+        in the same order as the platform's image carousel (adbot, Rightmove, Zoopla, then other
+        sources; display order within each listing). Use the index value with the
+        /images/download endpoint to fetch an image. Returns at most 50 images, or an empty
+        array if none are archived.
+      security:
+        - OAuth2: [search.comps]
+      parameters:
+        - name: dealId
+          in: path
+          required: true
+          description: Comparable deal UUID
+          schema:
+            type: string
+            format: uuid
+          example: "dace1cb1-6cbf-4529-be74-316c236083d6"
+      responses:
+        "200":
+          description: Image metadata (empty array if none archived)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      format: uuid
+                      description: Listing image UUID
+                    listingId:
+                      type: string
+                      format: uuid
+                      description: Parent listing UUID
+                    source:
+                      type: string
+                      enum: [adbot, rightmove, zoopla, other]
+                      description: Listing source the image was archived from
+                    displayOrder:
+                      type: integer
+                      nullable: true
+                      description: Position of the image within its listing
+                    index:
+                      type: integer
+                      description: Zero-based index for use with the download endpoint
+                  required:
+                    - id
+                    - listingId
+                    - source
+                    - index
+              example:
+                - id: "c3d4e5f6-a7b8-9012-cdef-123456789012"
+                  listingId: "b2c3d4e5-f6a7-8901-bcde-f12345678901"
+                  source: "adbot"
+                  displayOrder: 1
+                  index: 0
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          description: Detail service temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /comps/{dealId}/images/download:
+    get:
+      operationId: getCompsImagesDownload
+      tags:
+        - Comps
+      summary: Download an archived listing image for a comparable deal
+      description: |
+        Downloads an image file archived to blob storage for a comparable deal's listings.
+        Use the /comps/{dealId}/images endpoint first to list available images,
+        then use the index parameter to select which one to download.
+      security:
+        - OAuth2: [search.comps]
+      parameters:
+        - name: dealId
+          in: path
+          required: true
+          description: Comparable deal UUID
+          schema:
+            type: string
+            format: uuid
+          example: "dace1cb1-6cbf-4529-be74-316c236083d6"
+        - name: index
+          in: query
+          required: false
+          description: Zero-based index of the image to download (default 0)
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          example: 0
+      responses:
+        "200":
+          description: Image file
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          description: Detail service temporarily unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /titles/{titleId}/brochures:
     get:
       operationId: getTitleBrochures
