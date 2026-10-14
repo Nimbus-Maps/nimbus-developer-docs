@@ -32,6 +32,8 @@ curl -X POST "https://api.nimbusmaps.co.uk/docs/v1/subscribe" \
 
 The response includes a `secret`. Store it immediately; it is returned only once and is required for signature verification.
 
+With client-credentials tokens, a subscription belongs to your Entra application. Each application has one active subscription; subscribing again from the same application replaces it without affecting your other applications. Notifications for a purchase go to the subscription of the application that placed the order (or, if it has none, to a subscription created without an application). Use a separate app registration per environment (DEV, PREPROD, PROD); environments sharing one app id share one subscription.
+
 ## Event Payload
 
 ```json
