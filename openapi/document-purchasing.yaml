@@ -328,8 +328,13 @@ paths:
       description: |
         Register a webhook endpoint to receive notifications when purchased documents are ready.
 
-        The subscription is associated with your authentication credentials. All subsequent
-        document purchases will automatically trigger webhook notifications to this endpoint.
+        The subscription is associated with your authentication credentials. For client-credentials
+        (application) tokens it is scoped to your Entra application: each application has at most one
+        active subscription, and subscribing again from the same application replaces it without
+        affecting your other applications (for example separate DEV and PROD app registrations).
+        Notifications for a purchase are delivered to the subscription of the application that placed
+        the order, or to a subscription created without an application (for example with a delegated
+        user token) if that application has none.
 
         **Important:** Save the returned `secret` immediately. It cannot be retrieved later
         and is required to verify webhook signatures using HMAC-SHA256.
@@ -404,6 +409,9 @@ paths:
       description: |
         Cancel an active webhook subscription. Once cancelled, no further webhook
         notifications will be delivered for new document purchases.
+
+        You can cancel your own application's subscription, or a subscription created
+        without an application. Subscriptions belonging to other applications return 404.
       operationId: unsubscribe
       security:
         - OAuth2: [ docs.webhooks.manage ]
