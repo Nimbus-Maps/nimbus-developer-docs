@@ -3110,7 +3110,9 @@ paths:
         **Filtering:** Addresses that cannot be resolved to a UPRN are excluded from results.
 
         **Title selection:** When a UPRN is linked to multiple titles, the best match is selected by tenure priority
-        (Freehold > OWNERSHIP > PROPRIETOR > SUPERIOR, then smallest area). If no title is linked, `titleRef` is `null`.
+        (Freehold > OWNERSHIP > PROPRIETOR > SUPERIOR > Leasehold, then smallest area). If no title is linked, `titleRef` is `null`.
+        Set `priority=most_relevant` to instead prefer the title most specific to the matched address (fewest linked UPRNs),
+        e.g. a flat's leasehold title over the freehold of the whole block; tenure priority is then only a tiebreaker.
       security:
         - OAuth2: [search.address]
       parameters:
@@ -3122,6 +3124,17 @@ paths:
             type: string
             minLength: 3
           example: "30 Penarth Road Bolton"
+        - name: priority
+          in: query
+          required: false
+          description: |
+            Title selection strategy when a UPRN is linked to multiple titles. Set to `most_relevant` to prefer the
+            title most specific to the matched address (fewest linked UPRNs) over one that also covers other units in
+            the same building - use this when searching for a specific flat or unit. Omit for the default tenure-based selection.
+          schema:
+            type: string
+            enum: [most_relevant]
+          example: "most_relevant"
 
       responses:
         "200":
@@ -3191,7 +3204,7 @@ paths:
                       maxResults: 10
 
         "400":
-          description: Missing or invalid address parameter
+          description: Missing or invalid address or priority parameter
           content:
             application/json:
               schema:
@@ -3210,6 +3223,13 @@ paths:
                     error:
                       code: "INVALID_FORMAT"
                       message: "Parameter 'address' must be at least 3 characters"
+                      correlationId: "550e8400-e29b-41d4-a716-446655440000"
+                invalidPriority:
+                  summary: Unsupported priority value
+                  value:
+                    error:
+                      code: "INVALID_FORMAT"
+                      message: "Parameter 'priority' must be 'most_relevant'"
                       correlationId: "550e8400-e29b-41d4-a716-446655440000"
 
         "401":
