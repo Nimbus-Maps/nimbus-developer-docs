@@ -3440,8 +3440,11 @@ paths:
 
         **Filtering:** Addresses that cannot be resolved to a UPRN are excluded from results.
 
-        **Title selection:** When a UPRN is linked to multiple titles, the best match is selected by tenure priority
-        (Freehold > OWNERSHIP > PROPRIETOR > SUPERIOR, then smallest area). If no title is linked, `titleRef` is `null`.
+        **Title selection:** When a UPRN is linked to multiple titles, the best match is chosen by the `titlePriority` strategy.
+        The default, `tenure`, selects by tenure priority (Freehold > OWNERSHIP > PROPRIETOR > SUPERIOR > Leasehold, then smallest area).
+        `most_relevant` instead prefers the title most specific to the matched address (fewest linked UPRNs),
+        e.g. a flat's leasehold title over the freehold of the whole block; tenure priority is then only a tiebreaker.
+        If no title is linked, `titleRef` is `null`.
       security:
         - OAuth2: [search.address]
       parameters:
@@ -3453,6 +3456,19 @@ paths:
             type: string
             minLength: 3
           example: "30 Penarth Road Bolton"
+        - name: titlePriority
+          in: query
+          required: false
+          description: |
+            Title selection strategy when a UPRN is linked to multiple titles.
+            - `tenure` (default): prefer titles by tenure (Freehold > OWNERSHIP > PROPRIETOR > SUPERIOR > Leasehold), then smallest area.
+            - `most_relevant`: prefer the title most specific to the matched address (fewest linked UPRNs) over one that also
+              covers other units in the same building - use this when searching for a specific flat or unit.
+          schema:
+            type: string
+            enum: [tenure, most_relevant]
+            default: tenure
+          example: "most_relevant"
 
       responses:
         "200":
@@ -3529,7 +3545,7 @@ paths:
                       maxResults: 10
 
         "400":
-          description: Missing or invalid address parameter
+          description: Missing or invalid address or titlePriority parameter
           content:
             application/json:
               schema:
@@ -3548,6 +3564,13 @@ paths:
                     error:
                       code: "INVALID_FORMAT"
                       message: "Parameter 'address' must be at least 3 characters"
+                      correlationId: "550e8400-e29b-41d4-a716-446655440000"
+                invalidTitlePriority:
+                  summary: Unsupported titlePriority value
+                  value:
+                    error:
+                      code: "INVALID_FORMAT"
+                      message: "Parameter 'titlePriority' must be one of: tenure, most_relevant"
                       correlationId: "550e8400-e29b-41d4-a716-446655440000"
 
         "401":
