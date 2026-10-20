@@ -5,6 +5,22 @@ info:
     The Nimbus Property Search API provides access to comprehensive UK property data from the Nimbus golden record index.
     Search, filter, and retrieve property titles using a flexible query syntax — filter by location, property characteristics, geographic bounds, ownership, and more.
     For field reference and examples, see the Field Reference documentation.
+
+    ## API Management subscription and token billing
+
+    Calls through the API gateway can carry an `Ocp-Apim-Subscription-Key` header identifying
+    your Nimbus API subscription. If that subscription is on the **Token Rate Limiting** product,
+    every endpoint except `/health` uses one call from your company's daily API quota:
+
+    - You must pass a `subscriberCompanyId` query parameter identifying the company to bill.
+      Without it the gateway returns `403` with `{"error": "Missing subscriberCompanyId query parameter."}`.
+    - When the daily quota is used up, the gateway returns `402` with an
+      `application/problem+json` body (title `Daily quota exceeded`) without calling the backend.
+    - If the call then fails (any non-2xx response), the quota call is refunded automatically.
+    - Successful responses include `X-RateLimit-Limit`, `X-RateLimit-Remaining` and
+      `X-RateLimit-Reset` headers describing your daily quota.
+
+    OAuth-only callers and subscriptions on other products aren't billed.
   version: 1.0.0
   contact:
     name: Nimbus API Support
@@ -72,6 +88,13 @@ paths:
       responses:
         "200":
           description: Title found successfully
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -147,6 +170,8 @@ paths:
 
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
@@ -381,6 +406,13 @@ paths:
       responses:
         "200":
           description: Search results
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -426,6 +458,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "429":
@@ -457,6 +491,13 @@ paths:
       responses:
         "200":
           description: Comparable deal found successfully
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -507,6 +548,8 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
@@ -585,6 +628,13 @@ paths:
       responses:
         "200":
           description: Search results
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -593,6 +643,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "429":
@@ -625,6 +677,13 @@ paths:
       responses:
         "200":
           description: Sale detail records for the comparable deal
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -652,6 +711,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
@@ -690,6 +751,13 @@ paths:
       responses:
         "200":
           description: Lease detail records for the comparable deal
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -712,6 +780,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
@@ -750,6 +820,13 @@ paths:
       responses:
         "200":
           description: Listing detail records for the comparable deal
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -769,6 +846,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
@@ -808,6 +887,13 @@ paths:
       responses:
         "200":
           description: Brochure metadata (empty array if none archived)
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -849,6 +935,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
@@ -897,6 +985,13 @@ paths:
       responses:
         "200":
           description: Brochure PDF file
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/pdf:
               schema:
@@ -906,6 +1001,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
@@ -947,6 +1044,13 @@ paths:
       responses:
         "200":
           description: Image metadata (empty array if none archived)
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -988,6 +1092,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
@@ -1036,6 +1142,13 @@ paths:
       responses:
         "200":
           description: Image file
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             image/*:
               schema:
@@ -1045,6 +1158,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
@@ -1084,6 +1199,13 @@ paths:
       responses:
         "200":
           description: Brochure metadata across all deals for the title
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -1131,6 +1253,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
@@ -1173,6 +1297,13 @@ paths:
       responses:
         "200":
           description: Brochure PDF file
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/pdf:
               schema:
@@ -1182,6 +1313,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
@@ -1217,6 +1350,13 @@ paths:
       responses:
         "200":
           description: Image metadata across all deals for the title (empty array if none archived)
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -1270,6 +1410,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
@@ -1318,6 +1460,13 @@ paths:
       responses:
         "200":
           description: Image file
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             image/*:
               schema:
@@ -1327,6 +1476,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
@@ -1366,6 +1517,13 @@ paths:
       responses:
         "200":
           description: Footfall averages and monthly breakdown
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -1447,6 +1605,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
@@ -1491,6 +1651,13 @@ paths:
       responses:
         "200":
           description: Road traffic data near the title
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -1567,6 +1734,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
@@ -1598,6 +1767,13 @@ paths:
       responses:
         "200":
           description: Footfall averages and monthly breakdown
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -1672,6 +1848,8 @@ paths:
                     sleepingHours: 220.0
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
@@ -1735,6 +1913,13 @@ paths:
       responses:
         "200":
           description: Amenities found within the travel time polygon
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -1771,6 +1956,8 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
@@ -1860,6 +2047,13 @@ paths:
       responses:
         "200":
           description: Isochrone polygon for the title
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -1901,6 +2095,8 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
@@ -1963,6 +2159,13 @@ paths:
       responses:
         "200":
           description: Natural language query successfully converted and executed
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -1975,6 +2178,8 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "429":
@@ -2054,6 +2259,13 @@ paths:
       responses:
         "200":
           description: Natural language query successfully converted and executed
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -2136,6 +2348,8 @@ paths:
                       correlationId: 550e8400-e29b-41d4-a716-446655440000
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "429":
@@ -2179,6 +2393,13 @@ paths:
       responses:
         "200":
           description: Comparable deal summaries for the title
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -2208,6 +2429,8 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "429":
@@ -2239,6 +2462,13 @@ paths:
       responses:
         "200":
           description: Planning applications retrieved successfully
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -2306,6 +2536,8 @@ paths:
                       type: integer
                     year:
                       type: integer
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "404":
           $ref: "#/components/responses/NotFound"
         "401":
@@ -2339,6 +2571,13 @@ paths:
       responses:
         "200":
           description: Constraints retrieved successfully
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -2362,6 +2601,8 @@ paths:
                     overlapPercentage:
                       type: number
                       format: double
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "404":
           $ref: "#/components/responses/NotFound"
         "401":
@@ -2395,6 +2636,13 @@ paths:
       responses:
         "200":
           description: Sales history retrieved successfully
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -2416,6 +2664,8 @@ paths:
                     pricePerSquareFoot:
                       type: number
                       format: double
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "404":
           $ref: "#/components/responses/NotFound"
         "401":
@@ -2449,6 +2699,13 @@ paths:
       responses:
         "200":
           description: Lease information retrieved successfully
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -2505,6 +2762,8 @@ paths:
                       type: number
                       format: double
                       nullable: true
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "404":
           $ref: "#/components/responses/NotFound"
         "401":
@@ -2538,6 +2797,13 @@ paths:
       responses:
         "200":
           description: Leasehold information retrieved successfully
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -2571,6 +2837,8 @@ paths:
                     tenantLateFiling:
                       type: boolean
                       description: Whether leaseholder has late filings
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "404":
           $ref: "#/components/responses/NotFound"
         "401":
@@ -2604,6 +2872,13 @@ paths:
       responses:
         "200":
           description: Geometry data retrieved successfully
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -2643,6 +2918,8 @@ paths:
                   titleId:
                     type: string
                     format: uuid
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "404":
           $ref: "#/components/responses/NotFound"
         "401":
@@ -2676,6 +2953,13 @@ paths:
       responses:
         "200":
           description: Building information retrieved successfully
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -2720,6 +3004,8 @@ paths:
                       type: array
                       items:
                         $ref: "#/components/schemas/UPRN"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "404":
           $ref: "#/components/responses/NotFound"
         "401":
@@ -2753,6 +3039,13 @@ paths:
       responses:
         "200":
           description: EPC data retrieved successfully
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -2801,6 +3094,8 @@ paths:
                           "F+",
                           "G",
                         ]
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "404":
           $ref: "#/components/responses/NotFound"
         "401":
@@ -2834,6 +3129,13 @@ paths:
       responses:
         "200":
           description: Property data retrieved successfully
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -2908,6 +3210,8 @@ paths:
                             type: string
                           outcode:
                             type: string
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "404":
           $ref: "#/components/responses/NotFound"
         "401":
@@ -2941,6 +3245,13 @@ paths:
       responses:
         "200":
           description: Use classes retrieved successfully
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -2973,6 +3284,8 @@ paths:
                           classificationDescription:
                             type: string
                             nullable: true
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "404":
           $ref: "#/components/responses/NotFound"
         "401":
@@ -3006,6 +3319,13 @@ paths:
       responses:
         "200":
           description: Owner information retrieved successfully
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -3030,6 +3350,8 @@ paths:
                     titleId:
                       type: string
                       format: uuid
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "404":
           $ref: "#/components/responses/NotFound"
         "401":
@@ -3063,6 +3385,13 @@ paths:
       responses:
         "200":
           description: VOA data retrieved successfully
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -3087,6 +3416,8 @@ paths:
                           typeDescription:
                             type: string
                             description: VOA property type description
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "404":
           $ref: "#/components/responses/NotFound"
         "401":
@@ -3139,6 +3470,13 @@ paths:
       responses:
         "200":
           description: Address search results
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/vnd.api+json:
               schema:
@@ -3234,6 +3572,8 @@ paths:
 
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
         "403":
           $ref: "#/components/responses/Forbidden"
         "429":
@@ -3290,7 +3630,41 @@ components:
             search.comps: Search and retrieve comparable deal information
             search.address: Search for addresses and retrieve associated property IDs
 
+  headers:
+    DailyQuotaLimit:
+      description: Daily API call quota for your company. Set only for Token Rate Limiting subscriptions.
+      schema:
+        type: integer
+      example: 1000
+    DailyQuotaRemaining:
+      description: Calls left in today's quota, after this call and any refund. Set only for Token Rate Limiting subscriptions.
+      schema:
+        type: integer
+      example: 999
+    DailyQuotaReset:
+      description: When the daily quota resets (Unix timestamp, next midnight UTC). Set only for Token Rate Limiting subscriptions.
+      schema:
+        type: integer
+      example: 1760918400
+
   schemas:
+    DailyQuotaProblem:
+      type: object
+      description: RFC 7807 problem details returned by the gateway when the daily API quota is used up.
+      required:
+        - title
+      properties:
+        status:
+          type: integer
+          description: Status code reported by the quota service.
+          example: 503
+        title:
+          type: string
+          example: "Daily quota exceeded"
+        detail:
+          type: string
+          example: "Your daily API call limit has been reached. Please try again tomorrow."
+
     ComparableDeal:
       type: object
       description: Public comparable deal document.
@@ -5577,8 +5951,22 @@ components:
               message: "Authentication required: provide either valid Ocp-Apim-Subscription-Key or OAuth Bearer token"
               correlationId: "550e8400-e29b-41d4-a716-446655440000"
 
+    DailyQuotaExceeded:
+      description: Daily API quota used up (Token Rate Limiting subscriptions only). Returned by the gateway without calling the backend.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/DailyQuotaProblem"
+          example:
+            status: 503
+            title: "Daily quota exceeded"
+            detail: "Your daily API call limit has been reached. Please try again tomorrow."
+
     Forbidden:
-      description: Forbidden - insufficient permissions
+      description: |-
+        Forbidden - insufficient permissions. On a Token Rate Limiting subscription, also returned by the
+        gateway when the `subscriberCompanyId` query parameter is missing, with the body
+        `{"error": "Missing subscriberCompanyId query parameter."}`.
       content:
         application/json:
           schema:
