@@ -2192,6 +2192,17 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: AI service unavailable because of a provider configuration fault (for example a retired model or a rejected API key). Not transient; retrying will not help until the service is reconfigured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: AI_SERVICE_UNAVAILABLE
+                  message: "The AI query generation service is currently unavailable. Please use POST /comps with direct Elasticsearch Query DSL, or contact support with the correlation ID."
+                  correlationId: 550e8400-e29b-41d4-a716-446655440000
         "504":
           $ref: "#/components/responses/GatewayTimeout"
   /titles/nl-query:
@@ -2366,6 +2377,17 @@ paths:
                 error:
                   code: AI_SERVICE_ERROR
                   message: "The natural language query service is temporarily unavailable. Please try again or use POST /titles with a structured query."
+                  correlationId: 550e8400-e29b-41d4-a716-446655440000
+        "503":
+          description: AI service unavailable because of a provider configuration fault (for example a retired model or a rejected API key). Not transient; retrying will not help until the service is reconfigured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error:
+                  code: AI_SERVICE_UNAVAILABLE
+                  message: "The AI query generation service is currently unavailable. Please use POST /titles with direct Elasticsearch Query DSL, or contact support with the correlation ID."
                   correlationId: 550e8400-e29b-41d4-a716-446655440000
         "504":
           $ref: "#/components/responses/GatewayTimeout"
