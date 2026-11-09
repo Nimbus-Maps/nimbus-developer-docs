@@ -3597,25 +3597,29 @@ paths:
       tags:
         - Utilities
       summary: Health check
-      description: Check the health status of the API
+      description: >-
+        Unauthenticated, rate-limited dependency check for monitoring. Checks Elasticsearch and the
+        natural-language query service, including its AI model. Returns a status only.
       security: []
       responses:
         "200":
-          description: Service is healthy
+          description: All dependencies are healthy
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
               example:
                 status: "healthy"
-                timestamp: "2026-01-10T12:34:56Z"
-                version: "2.0.0"
+        "429":
+          description: Rate limit exceeded (30 requests per minute per IP)
         "503":
-          description: Service is unhealthy
+          description: A dependency is unhealthy or unreachable
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: "unhealthy"
 
 components:
   securitySchemes:
@@ -5762,19 +5766,12 @@ components:
       type: object
       required:
         - status
-        - timestamp
+      additionalProperties: false
       properties:
         status:
           type: string
           enum: [healthy, unhealthy]
           example: "healthy"
-        timestamp:
-          type: string
-          format: date-time
-          example: "2026-01-10T12:34:56Z"
-        version:
-          type: string
-          example: "2.0.0"
 
     AddressSearchResponse:
       type: object
