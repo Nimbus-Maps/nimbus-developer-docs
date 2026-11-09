@@ -48,6 +48,26 @@ info:
     - 60 requests per minute per user
     - 1,000 requests per hour per user
 
+    ## API Management subscription and token billing
+
+    Calls through the API gateway also carry an `Ocp-Apim-Subscription-Key` header identifying
+    your Nimbus API subscription. If that subscription is on the **Jupiter** (or **Token Rate
+    Limiting**) product, `POST /purchase` and `POST /verify-ownership` each use one call from
+    your daily API quota:
+
+    - When the daily quota is used up, the gateway returns `402` with an
+      `application/problem+json` body (title `Daily quota exceeded`) without calling the backend.
+    - If the call then fails (any non-2xx response), the quota call is refunded automatically.
+    - Successful responses include `X-RateLimit-Limit`, `X-RateLimit-Remaining` and
+      `X-RateLimit-Reset` headers describing your daily quota.
+    - Application (client-credentials) tokens carry no company, so they must pass the
+      `subscriberCompanyId` query parameter identifying the company to bill. Otherwise the
+      gateway returns `400 MISSING_SUBSCRIBER_COMPANY_ID`.
+
+    The daily quota is separate from the document token balance that `/purchase` charges
+    through the Ledger (`402 INSUFFICIENT_BALANCE`). Other endpoints, and subscriptions on
+    other products, aren't affected.
+
     ## Workflow
     1. Call `/check-availability` to see available documents and costs
     2. Call `/purchase` with the documents you want to buy
@@ -598,6 +618,8 @@ paths:
       security:
         - OAuth2: [ docs.purchase ]
         - OAuth2ClientCredentials: []
+      parameters:
+        - $ref: "#/components/parameters/SubscriberCompanyId"
       requestBody:
         required: true
         content:
@@ -642,6 +664,13 @@ paths:
       responses:
         "201":
           description: Order created successfully and processing started
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -666,7 +695,7 @@ paths:
                     new_balance: 129
                     estimated_delivery: "2026-01-15T14:35:00Z"
         "400":
-          $ref: "#/components/responses/BadRequest"
+          $ref: "#/components/responses/BillableBadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "402":
@@ -956,6 +985,8 @@ paths:
       security:
         - OAuth2: [ docs.purchase ]
         - OAuth2ClientCredentials: []
+      parameters:
+        - $ref: "#/components/parameters/SubscriberCompanyId"
       requestBody:
         required: true
         content:
@@ -981,6 +1012,13 @@ paths:
       responses:
         "200":
           description: Ownership verification completed successfully
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
           content:
             application/json:
               schema:
@@ -1054,11 +1092,13 @@ paths:
                     new_balance: 149
                     verified_at: "2026-02-25T21:04:37Z"
         "400":
-          $ref: "#/components/responses/BadRequest"
+          $ref: "#/components/responses/BillableBadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "402":
-          description: Insufficient token balance
+          description: |-
+            Insufficient token balance (`application/json`), or daily API quota exceeded for a
+            Jupiter-product subscription (`application/problem+json`).
           content:
             application/json:
               schema:
@@ -1071,6 +1111,13 @@ paths:
                     required: 1
                     available: 0
                     shortfall: 1
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/DailyQuotaProblem"
+              example:
+                status: 503
+                title: "Daily quota exceeded"
+                detail: "Your daily API call limit has been reached. Please try again tomorrow."
         "404":
           description: Title not found
           content:
@@ -1096,10 +1143,10 @@ paths:
         - Health
       summary: Health check endpoint
       description: |
-        Check the health status of the API service and its dependencies.
+        Unauthenticated dependency check for monitoring, rate-limited to 30 requests per minute per IP.
 
-        Returns 200 if all systems are operational.
-        Returns 503 if any critical dependency is unavailable.
+        Returns 200 if the service and its dependencies are operational, otherwise 503. The gateway returns
+        a status only; dependency detail is not exposed.
       operationId: healthCheck
       security: [] # No authentication required
       responses:
@@ -1111,26 +1158,16 @@ paths:
                 $ref: "#/components/schemas/HealthResponse"
               example:
                 status: "healthy"
-                timestamp: "2026-01-15T14:30:00Z"
-                checks:
-                  database: "ok"
-                  redis: "ok"
-                  document_provider: "ok"
-                  ledger_api: "ok"
+        "429":
+          description: Rate limit exceeded
         "503":
-          description: Service is unhealthy
+          description: Service or a dependency is unhealthy or unreachable
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
               example:
                 status: "unhealthy"
-                timestamp: "2026-01-15T14:30:00Z"
-                checks:
-                  database: "ok"
-                  redis: "ok"
-                  document_provider: "error"
-                  ledger_api: "ok"
 
 components:
   securitySchemes:
@@ -1173,7 +1210,59 @@ components:
           scopes:
             /.default: Requests all app roles granted to your Entra app registration
 
+  parameters:
+    SubscriberCompanyId:
+      name: subscriberCompanyId
+      in: query
+      required: false
+      description: |-
+        The company to bill for this call's daily API quota. Required for application
+        (client-credentials) tokens on a Jupiter-product subscription. Ignored for delegated
+        tokens, which are billed to the signed-in user's company.
+      schema:
+        type: string
+
+  headers:
+    DailyQuotaLimit:
+      description: Daily API call quota for your company. Set only for Jupiter-product subscriptions.
+      schema:
+        type: integer
+        examples:
+          - 1000
+    DailyQuotaRemaining:
+      description: Calls left in today's quota, after this call and any refund. Set only for Jupiter-product subscriptions.
+      schema:
+        type: integer
+        examples:
+          - 999
+    DailyQuotaReset:
+      description: When the daily quota resets (Unix timestamp, next midnight UTC). Set only for Jupiter-product subscriptions.
+      schema:
+        type: integer
+        examples:
+          - 1760918400
+
   schemas:
+    DailyQuotaProblem:
+      type: object
+      description: RFC 7807 problem details returned by the gateway when the daily API quota is used up.
+      required:
+        - title
+      properties:
+        status:
+          type: integer
+          description: Status code reported by the quota service.
+          examples:
+            - 503
+        title:
+          type: string
+          examples:
+            - "Daily quota exceeded"
+        detail:
+          type: string
+          examples:
+            - "Your daily API call limit has been reached. Please try again tomorrow."
+
     ReferredDocumentPurchaseItem:
       type: object
       required:
@@ -2092,8 +2181,7 @@ components:
       type: object
       required:
         - status
-        - timestamp
-        - checks
+      additionalProperties: false
       properties:
         status:
           type: string
@@ -2101,36 +2189,6 @@ components:
           description: Overall health status
           examples:
             - "healthy"
-        timestamp:
-          type: string
-          format: date-time
-          description: Timestamp of the health check
-          examples:
-            - "2026-01-15T14:30:00Z"
-        checks:
-          type: object
-          description: Health status of individual dependencies
-          properties:
-            database:
-              type: string
-              enum: [ ok, error ]
-              examples:
-                - "ok"
-            redis:
-              type: string
-              enum: [ ok, error ]
-              examples:
-                - "ok"
-            document_provider:
-              type: string
-              enum: [ ok, error ]
-              examples:
-                - "ok"
-            ledger_api:
-              type: string
-              enum: [ ok, error ]
-              examples:
-                - "ok"
 
     ErrorResponse:
       type: object
@@ -2550,8 +2608,36 @@ components:
             error: "Not found"
             message: "Title number not found"
 
+    BillableBadRequest:
+      description: |-
+        Invalid request parameters, or (gateway) an application token on a Jupiter-product
+        subscription called without `subscriberCompanyId`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+          examples:
+            invalidRequest:
+              summary: Invalid request parameters
+              value:
+                error:
+                  code: "INVALID_REQUEST"
+                  message: "Invalid title number format"
+                  details:
+                    field: "title_number"
+                    value: "INVALID"
+                    pattern: "^[A-Z]{0,3}[0-9]{1,7}$"
+            missingSubscriberCompanyId:
+              summary: Application token without subscriberCompanyId
+              value:
+                error:
+                  code: "MISSING_SUBSCRIBER_COMPANY_ID"
+                  message: "Application (client-credentials) callers must pass a subscriberCompanyId query parameter identifying the company to bill."
+
     PaymentRequired:
-      description: Insufficient token balance
+      description: |-
+        Insufficient token balance (`application/json`), or daily API quota exceeded for a
+        Jupiter-product subscription (`application/problem+json`).
       content:
         application/json:
           schema:
@@ -2563,6 +2649,13 @@ components:
               details:
                 required: 10
                 available: 5
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/DailyQuotaProblem"
+          example:
+            status: 503
+            title: "Daily quota exceeded"
+            detail: "Your daily API call limit has been reached. Please try again tomorrow."
 
     TooManyRequests:
       description: Rate limit exceeded
