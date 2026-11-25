@@ -48,6 +48,16 @@ Estimate footfall and road traffic for that title.
 
 Your Nimbus account, subscription, and product permissions determine which tools and data are available after authentication.
 
+### Nearest substation (staging preview)
+
+If your connector lists `get_title_nearest_substation`, try this prompt.
+
+```text
+For this property title, find the nearest recorded electricity substation and its distance. How much extra power could customers draw or generators export?
+```
+
+The tool uses the Nimbus title ID. The assistant can quote demand and generation headroom separately when each figure has a known unit. The network operator must confirm which station serves the property and what capacity is available for a connection.
+
 ## Before You Start
 
 Make sure you have:
