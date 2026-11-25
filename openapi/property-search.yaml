@@ -1502,6 +1502,9 @@ paths:
         Returns the station with the shortest distance to the title polygon.
         A station within the polygon has a distance of zero. A nearby station's
         location does not establish which station supplies the property.
+        Demand headroom describes additional electricity the network can deliver.
+        Generation headroom describes additional electricity generators can export into the network.
+        Either figure can be unavailable independently.
         The standard Property Search subscription and billing rules apply.
       security:
         - OAuth2: [search.titles]
@@ -1539,7 +1542,7 @@ paths:
                   nearestSubstation:
                     type: object
                     nullable: true
-                    required: [identifier, name, operator, type, distanceMetres, demandHeadroom, demandHeadroomUnit, demandHeadroomBasis, recordedStatus, lastLoadedAt]
+                    required: [identifier, name, operator, type, distanceMetres, demandHeadroom, demandHeadroomUnit, demandHeadroomBasis, generationHeadroom, generationHeadroomUnit, generationHeadroomBasis, recordedStatus, lastLoadedAt]
                     properties:
                       identifier:
                         type: string
@@ -1569,6 +1572,18 @@ paths:
                         type: string
                         nullable: true
                         description: How the value was obtained, such as operator_reported or calculated. Null when unknown.
+                      generationHeadroom:
+                        type: string
+                        nullable: true
+                        description: Station export headroom as recorded, including zero or negative values. Null for older records or when the source lacks a station-wide figure.
+                      generationHeadroomUnit:
+                        type: string
+                        nullable: true
+                        description: Unit of generation headroom, such as MW or MVA. Null when unknown.
+                      generationHeadroomBasis:
+                        type: string
+                        nullable: true
+                        description: How generation headroom was obtained, such as operator_reported or calculated. Null when unknown.
                       recordedStatus:
                         type: string
                         nullable: true
