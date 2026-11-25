@@ -1493,6 +1493,115 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /titles/{titleId}/nearest-substation:
+    get:
+      operationId: getTitleNearestSubstation
+      tags: [Titles]
+      summary: Find the nearest recorded substation to a title
+      description: |
+        Returns the station with the shortest distance to the title polygon.
+        A station within the polygon has a distance of zero. A nearby station's
+        location does not establish which station supplies the property.
+        The standard Property Search subscription and billing rules apply.
+      security:
+        - OAuth2: [search.titles]
+      parameters:
+        - name: titleId
+          in: path
+          required: true
+          description: Nimbus title UUID.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Nearest station, or a null station when no station record is available.
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/DailyQuotaLimit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/DailyQuotaRemaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/DailyQuotaReset"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [titleId, nearestSubstation, supplyConnection]
+                properties:
+                  titleId:
+                    type: string
+                    format: uuid
+                  supplyConnection:
+                    type: string
+                    enum: [unverified]
+                    description: Nimbus has no verified supply link for this lookup.
+                  nearestSubstation:
+                    type: object
+                    nullable: true
+                    required: [identifier, name, operator, type, distanceMetres, demandHeadroom, demandHeadroomUnit, demandHeadroomBasis, recordedStatus, lastLoadedAt]
+                    properties:
+                      identifier:
+                        type: string
+                        nullable: true
+                      name:
+                        type: string
+                        nullable: true
+                      operator:
+                        type: string
+                        nullable: true
+                      type:
+                        type: string
+                        nullable: true
+                      distanceMetres:
+                        type: number
+                        minimum: 0
+                        description: Distance to the title polygon in metres, rounded to the nearest metre.
+                      demandHeadroom:
+                        type: string
+                        nullable: true
+                        description: Demand headroom as recorded, including zero. Null when unavailable.
+                      demandHeadroomUnit:
+                        type: string
+                        nullable: true
+                        description: Unit of the recorded value, such as MW or MVA. Null when unknown.
+                      demandHeadroomBasis:
+                        type: string
+                        nullable: true
+                        description: How the value was obtained, such as operator_reported or calculated. Null when unknown.
+                      recordedStatus:
+                        type: string
+                        nullable: true
+                        description: Status text from the source. Its meaning depends on the source.
+                      lastLoadedAt:
+                        type: string
+                        nullable: true
+                        description: Nimbus load timestamp without an assigned time zone.
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "402":
+          $ref: "#/components/responses/DailyQuotaExceeded"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          description: Nimbus could not find the title or a usable title boundary.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "503":
+          description: The substation lookup service is not configured.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
   /titles/{titleId}/footfall:
     get:
       operationId: getTitleFootfall
