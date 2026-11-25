@@ -48,7 +48,7 @@ Estimate footfall and road traffic for that title.
 
 Your Nimbus account, subscription, and product permissions determine which tools and data are available after authentication.
 
-### Nearest substation (staging preview)
+### Nearest substation
 
 If your connector lists `get_title_nearest_substation`, try this prompt.
 
