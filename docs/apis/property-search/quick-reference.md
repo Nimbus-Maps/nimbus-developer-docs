@@ -61,7 +61,12 @@ Token:         https://login.microsoftonline.com/d2a91423-0dc1-4853-8515-7b7b7d2
 | GET | `/titles/{titleId}/voa` | VOA classifications | Yes |
 | GET | `/titles/{titleId}/comps` | Comparable deals for this title | Yes |
 | GET | `/titles/{titleId}/footfall` | Footfall estimates | Yes |
+| GET | `/titles/{titleId}/nearest-substation` | Nearest recorded electricity substation and available headroom | Yes |
 | GET | `/titles/{titleId}/brochures` | Brochures | Yes |
+
+For the substation lookup, use a Nimbus title UUID. The response gives the shortest distance in metres to the title footprint. A station inside the footprint has a distance of zero. The supply connection is `unverified`.
+
+`demandHeadroom` describes extra power customers could draw. `generationHeadroom` describes extra power generators could export. Use each value with its own unit. A recorded zero is a value. A null means that figure is unavailable.
 
 ### Comps
 
